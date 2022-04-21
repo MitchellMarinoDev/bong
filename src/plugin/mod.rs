@@ -65,3 +65,14 @@ impl<C, R, D> ClientPlugin<C, R, D>
         Self(PhantomData)
     }
 }
+
+impl<C, R, D> Default for ClientPlugin<C, R, D>
+    where
+        C: Any + Send + Sync,
+        R: Any + Send + Sync,
+        D: Any + Send + Sync,
+{
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}

@@ -6,7 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = "0.6.1"
+bevy = { version = "0.7.0", features = ["bevy_dylib"] }
 carrier-pigeon = "0.2.0"
 serde = { version = "~1.0", features = ["derive"] }
-heron = "3.0.0"
+heron = { version = "3.0.0", features = ["2d"] }
+simple_logger = "2.1.0"
+
+[profile.dev.package."*"]
+opt-level = 3
