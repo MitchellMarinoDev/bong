@@ -5,6 +5,8 @@ use bevy::prelude::*;
 use crate::messages::{Connection, Disconnect, Response};
 use crate::plugin::ClientPlugin;
 use bevy::render::camera::ScalingMode;
+use bevy::render::render_resource::Texture;
+use carrier_pigeon::Header;
 use heron::prelude::*;
 
 type Client = carrier_pigeon::Client<Connection, Response, Disconnect>;
@@ -13,14 +15,14 @@ type Server = carrier_pigeon::Server<Connection, Response, Disconnect>;
 fn main() {
     App::new()
         // Plugins
-        .add_plugins(DefaultPlugins)
-        .add_plugin(PhysicsPlugin::default())
-
         .insert_resource(WindowDescriptor {
-            title: "Warloards".into(),
-            mode: bevy::window::WindowMode::Fullscreen,
+            title: "Bong".into(),
+            mode: bevy::window::WindowMode::Windowed,
             ..Default::default()
         })
+
+        .add_plugins(DefaultPlugins)
+        .add_plugin(PhysicsPlugin::default())
 
         .add_plugin(ClientPlugin::<Connection, Response, Disconnect>::default())
         .add_startup_system_to_stage(StartupStage::PreStartup, setup)
@@ -31,7 +33,10 @@ fn main() {
 
 fn setup(
     mut commands: Commands,
+    assets: Res<AssetServer>,
 ) {
+    let ball_ico = assets.load("ball.png");
+
     let mut camera = OrthographicCameraBundle::new_2d();
     camera.orthographic_projection.scaling_mode = ScalingMode::None;
     camera.orthographic_projection.left = -1920.0/2.0;
@@ -49,47 +54,62 @@ fn setup(
         .with_children(|cb| {
             // Bottom
             cb.spawn()
-                .insert(Transform::from_xyz(0.0, (-1080.0/2.0)-10.0, 0.0))
+                .insert(Transform::from_xyz(0.0, (-1080.0/2.0)-40.0, 0.0))
                 .insert(GlobalTransform::default())
-                .insert(CollisionShape::Cuboid { half_extends: Vec3::new(1920.0/2.0, 20.0, 0.0), border_radius: None });
+                .insert(CollisionShape::Cuboid { half_extends: Vec3::new(2000.0/2.0, 40.0, 0.0), border_radius: None });
 
             // Top
             cb.spawn()
-                .insert(Transform::from_xyz(0.0, (1080.0/2.0)+10.0, 0.0))
+                .insert(Transform::from_xyz(0.0, (1080.0/2.0)+40.0, 0.0))
                 .insert(GlobalTransform::default())
-                .insert(CollisionShape::Cuboid { half_extends: Vec3::new(1920.0/2.0, 20.0, 0.0), border_radius: None });
+                .insert(CollisionShape::Cuboid { half_extends: Vec3::new(2000.0/2.0, 40.0, 0.0), border_radius: None });
 
             // Left
             cb.spawn()
-                .insert(Transform::from_xyz((-1920.0/2.0)-10.0, 0.0, 0.0))
+                .insert(Transform::from_xyz((-1920.0/2.0)-40.0, 0.0, 0.0))
                 .insert(GlobalTransform::default())
-                .insert(CollisionShape::Cuboid { half_extends: Vec3::new(20.0, 1080.0/2.0, 0.0), border_radius: None });
+                .insert(CollisionShape::Cuboid { half_extends: Vec3::new(40.0, 1160.0/2.0, 0.0), border_radius: None });
 
             // Right
             cb.spawn()
-                .insert(Transform::from_xyz((1920.0/2.0)+10.0, 0.0, 0.0))
+                .insert(Transform::from_xyz((1920.0/2.0)+40.0, 0.0, 0.0))
                 .insert(GlobalTransform::default())
-                .insert(CollisionShape::Cuboid { half_extends: Vec3::new(20.0, 1080.0/2.0, 0.0), border_radius: None });
+                .insert(CollisionShape::Cuboid { half_extends: Vec3::new(40.0, 1160.0/2.0, 0.0), border_radius: None });
 
         })
         .insert(PhysicMaterial { restitution: 1.0, ..Default::default() })
     ;
 
-    // Bricks
+    // Bricks Left
     let height = 108.0;
+    let width = 60.0;
     let count = 10;
-    let rows = 3;
+    let colors = [Color::RED, Color::ORANGE_RED, Color::ORANGE, Color::YELLOW, Color::YELLOW_GREEN, Color::GREEN];
 
-    for r in 0..rows {
-        let red = r * 50 + 155;
-        let x = -600.0 - 60.0 * r as f32;
+    for r in 0..colors.len() {
+        let color = colors[r];
+        let x = -500.0 - width * r as f32;
         for i in 1..=count {
-            let gb = if i % 2 == 0 { 0 } else { 50 };
-            let color = Color::rgb_u8(red, gb, gb);
             let h = i as f32 - (count+1) as f32 / 2.0;
-            spawn_brick(&mut commands, color, [x,  (h * height)].into(), 30.0, height);
+            spawn_brick(&mut commands, color, [x,  (h * height)].into(), width, height);
         }
     }
+
+    // Bricks Right
+    let height = 108.0;
+    let width = 60.0;
+    let count = 10;
+    let colors = [Color::SEA_GREEN, Color::BLUE, Color::MIDNIGHT_BLUE, Color::INDIGO, Color::PURPLE, Color::VIOLET];
+
+    for r in 0..colors.len() {
+        let color = colors[r];
+        let x = 500.0 + width * r as f32;
+        for i in 1..=count {
+            let h = i as f32 - (count+1) as f32 / 2.0;
+            spawn_brick(&mut commands, color, [x,  (h * height)].into(), width, height);
+        }
+    }
+
 
     // ball
     commands.spawn()
@@ -99,6 +119,7 @@ fn setup(
                 custom_size: Some(Vec2::new(20.0, 20.0)),
                 ..Default::default()
             },
+            texture: ball_ico,
             transform: Transform::from_xyz(-500.0, 500.0, 0.0),
             ..Default::default()
         })

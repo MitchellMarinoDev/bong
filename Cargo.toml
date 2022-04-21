@@ -9,8 +9,7 @@ edition = "2021"
 bevy = { version = "0.7.0", features = ["bevy_dylib"] }
 carrier-pigeon = "0.2.0"
 serde = { version = "~1.0", features = ["derive"] }
-heron = { version = "3.0.0", features = ["2d"] }
-simple_logger = "2.1.0"
+heron = { version = "3.0", features = ["2d"] }
 
 [profile.dev.package."*"]
 opt-level = 3
