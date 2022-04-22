@@ -12,6 +12,11 @@ use heron::prelude::*;
 type Client = carrier_pigeon::Client<Connection, Response, Disconnect>;
 type Server = carrier_pigeon::Server<Connection, Response, Disconnect>;
 
+enum Team {
+    Left,
+    Right,
+}
+
 fn main() {
     App::new()
         // Plugins
@@ -27,7 +32,6 @@ fn main() {
         .add_plugin(ClientPlugin::<Connection, Response, Disconnect>::default())
         .add_startup_system_to_stage(StartupStage::PreStartup, setup)
         .add_system(break_bricks)
-        // .add_system(debug_vel)
         .run();
 }
 
@@ -36,7 +40,9 @@ fn setup(
     assets: Res<AssetServer>,
 ) {
     let ball_ico = assets.load("ball.png");
+    let crown_ico = assets.load("crown.png");
 
+    // Camera
     let mut camera = OrthographicCameraBundle::new_2d();
     camera.orthographic_projection.scaling_mode = ScalingMode::None;
     camera.orthographic_projection.left = -1920.0/2.0;
@@ -110,7 +116,6 @@ fn setup(
         }
     }
 
-
     // ball
     commands.spawn()
         .insert_bundle(SpriteBundle {
@@ -120,15 +125,53 @@ fn setup(
                 ..Default::default()
             },
             texture: ball_ico,
-            transform: Transform::from_xyz(-500.0, 500.0, 0.0),
+            // transform: Transform::from_xyz(-500.0, 500.0, 0.0),
             ..Default::default()
         })
         .insert(CollisionShape::Sphere { radius: 10.0 })
         .insert(RigidBody::Dynamic)
         .insert(PhysicMaterial { restitution: 1.0, ..Default::default() })
         .insert(RotationConstraints::lock())
-        .insert(Velocity::from_linear(Vec3::new(500.0, -500.0, 0.0)))
+        .insert(Velocity::from_linear(Vec3::new(750.0, -500.0, 0.0)))
         .insert(Ball)
+    ;
+
+    // Targets
+    let target_size = 125.0;
+    commands.spawn()
+        .insert_bundle(SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgb_u8(255, 25, 25),
+                custom_size: Some(Vec2::new(target_size, target_size)),
+                ..Default::default()
+            },
+            texture: crown_ico.clone(),
+            transform: Transform::from_xyz(-897.5, 0.0, 0.0),
+            ..Default::default()
+        })
+        .insert(CollisionShape::Sphere { radius: target_size/2.0 })
+        .insert(RigidBody::Sensor)
+        .insert(PhysicMaterial { restitution: 1.0, ..Default::default() })
+        .insert(RotationConstraints::lock())
+        .insert(Target(Team::Left))
+    ;
+
+    commands.spawn()
+        .insert_bundle(SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgb_u8(25, 25, 255),
+                custom_size: Some(Vec2::new(target_size, target_size)),
+                ..Default::default()
+            },
+            texture: crown_ico,
+            transform: Transform::from_xyz(897.5, 0.0, 0.0),
+            ..Default::default()
+        })
+        .insert(CollisionShape::Sphere { radius: target_size/2.0 })
+        .insert(RigidBody::Sensor)
+        .insert(PhysicMaterial { restitution: 1.0, ..Default::default() })
+        .insert(RotationConstraints::lock())
+        .insert(Target(Team::Right))
     ;
 }
 
@@ -177,15 +220,11 @@ fn spawn_brick(mut commands: &mut Commands, color: Color, center: Vec2, width: f
     ;
 }
 
-fn debug_vel(
-    q_ball: Query<&Velocity, With<Ball>>,
-) {
-    let ball = q_ball.single();
-    println!("{:?}", ball.linear);
-}
-
 #[derive(Component)]
 struct Brick;
 
 #[derive(Component)]
 struct Ball;
+
+#[derive(Component)]
+struct Target(Team);
