@@ -119,14 +119,16 @@ fn setup_menu(
 fn handle_ui(
     q_interaction: Query<(&Interaction, &MenuButton), Changed<Interaction>>,
     mut game_state: ResMut<State<GameState>>,
+    mut commands: Commands,
 ) {
     for (interaction, menu_button) in q_interaction.iter() {
         if *interaction == Interaction::Clicked {
             match menu_button {
-                MenuButton::Server => game_state.set(GameState::Lobby(MultiplayerType::Server)).unwrap(),
-                MenuButton::Host   => game_state.set(GameState::Lobby(MultiplayerType::Host)).unwrap(),
-                MenuButton::Client => game_state.set(GameState::Lobby(MultiplayerType::Client)).unwrap(),
+                MenuButton::Server => commands.insert_resource(MultiplayerType::Server),
+                MenuButton::Host   => commands.insert_resource(MultiplayerType::Host),
+                MenuButton::Client => commands.insert_resource(MultiplayerType::Client),
             }
+            game_state.set(GameState::Lobby).unwrap()
         }
     }
 }

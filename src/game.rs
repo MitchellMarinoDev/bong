@@ -215,7 +215,7 @@ fn break_bricks(
     }
 }
 
-fn spawn_brick(mut commands: &mut Commands, color: Color, center: Vec2, width: f32, height: f32) {
+fn spawn_brick(commands: &mut Commands, color: Color, center: Vec2, width: f32, height: f32) {
     commands.spawn()
         .insert_bundle(SpriteBundle {
             sprite: Sprite {
