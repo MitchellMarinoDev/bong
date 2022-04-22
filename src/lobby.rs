@@ -1,5 +1,7 @@
 use bevy::prelude::*;
-use crate::{Client, Connection, GameState, MsgTableParts, MultiplayerType, Server};
+use carrier_pigeon::CId;
+use crate::{Client, Connection, GameState, MsgTableParts, MultiplayerType, Response, Server};
+use crate::messages::RejectReason;
 
 pub struct LobbyPlugin;
 
@@ -10,15 +12,52 @@ struct LobbyItem;
 
 #[derive(Component)]
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+/// A marker for the status indicator text field.
+struct StatusLabel;
+
+#[derive(Component)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 /// The player marker
 enum Player {
     One,
     Two,
 }
 
+#[derive(Clone, Eq, PartialEq, Debug, Default)]
+struct Players {
+    p1: Option<(CId, String)>,
+    p2: Option<(CId, String)>,
+}
+
+impl Players {
+    fn count(&self) -> usize {
+        match (&self.p1, &self.p2) {
+            (None, None) => 0,
+            (Some(_), None) => 1,
+            (None, Some(_)) => 1,
+            (Some(_), Some(_)) => 2,
+        }
+    }
+
+    fn add(&mut self, cid: CId, name: String) -> bool {
+        match (&self.p1, &self.p2) {
+            (None, _) => {
+                self.p1 = Some((cid, name));
+                true
+            },
+            (Some(_), None) => {
+                self.p2 = Some((cid, name));
+                true
+            },
+            (Some(_), Some(_)) => false,
+        }
+    }
+}
+
 impl Plugin for LobbyPlugin {
     fn build(&self, app: &mut App) {
         app
+            .insert_resource(Players::default())
             .add_system_set(
                 SystemSet::on_enter(GameState::Lobby)
                     .with_system(setup_networking)
@@ -27,6 +66,9 @@ impl Plugin for LobbyPlugin {
             .add_system_set(
                 SystemSet::on_update(GameState::Lobby)
                     .with_system(handle_ui)
+                    .with_system(handle_connections)
+                    .with_system(update_status)
+                    .with_system(update_player_labels)
             )
             .add_system_set(
                 SystemSet::on_exit(GameState::Lobby)
@@ -95,12 +137,22 @@ fn setup_lobby_ui(
             // Title
             cb.spawn_bundle(TextBundle {
                 style: Style {
-                    margin: Rect::all(Val::Px(20.0)),
+                    margin: Rect{ bottom: Val::Px(0.0), ..Rect::all(Val::Px(20.0))},
                     ..Default::default()
                 },
                 text: Text::with_section("Lobby", text_style.clone(), TextAlignment::default()),
                 ..Default::default()
             });
+
+            // Status
+            cb.spawn_bundle(TextBundle {
+                style: Style {
+                    margin: Rect::all(Val::Px(10.0)),
+                    ..Default::default()
+                },
+                text: Text::with_section("Status: --", TextStyle { font_size: 40.0, ..text_style.clone() }, TextAlignment::default()),
+                ..Default::default()
+            }).insert(StatusLabel);
 
             // Players holder
             cb
@@ -138,6 +190,56 @@ fn setup_lobby_ui(
     ;
 }
 
+fn update_status(
+    mut q_status: Query<&mut Text, With<StatusLabel>>,
+    multiplayer_type: Res<MultiplayerType>,
+    client: Option<Res<Client>>,
+    server: Option<Res<Server>>,
+) {
+    let status = format!("Status: {}",
+        match *multiplayer_type {
+            MultiplayerType::Client => {
+                match client {
+                    Some(client) if client.open() => "Client connected",
+                    _ => "Client not connected",
+                }
+            }
+            _ => {
+                if server.is_some() {
+                    "Server Listening"
+                } else {
+                    "No Server"
+                }
+            }
+        }
+    );
+
+    for mut c_status in q_status.iter_mut() {
+        c_status.sections[0].value = status.clone();
+    }
+}
+
+fn update_player_labels(
+    mut q_player_label: Query<(&mut Text, &Player)>,
+    players: Res<Players>,
+) {
+    let p1_txt = match &players.p1 {
+        None => "Player 1".to_owned(),
+        Some(p) => p.1.clone(),
+    };
+    let p2_txt = match &players.p2 {
+        None => "Player 2".to_owned(),
+        Some(p) => p.1.clone(),
+    };
+
+    for (mut text, player) in q_player_label.iter_mut() {
+        match player {
+            Player::One => text.sections[0].value = p1_txt.clone(),
+            Player::Two => text.sections[0].value = p2_txt.clone(),
+        }
+    }
+}
+
 fn handle_ui(
     // q_interaction: Query<(&Interaction, &MenuButton), Changed<Interaction>>,
     mut game_state: ResMut<State<GameState>>,
@@ -151,6 +253,23 @@ fn handle_ui(
     //         }
     //     }
     // }
+}
+
+fn handle_connections(
+    server: Option<ResMut<Server>>,
+    mut players: ResMut<Players>,
+) {
+    if let Some(mut server) = server {
+        server.handle_new_cons(&mut |cid, c| {
+            if players.add(cid, c.name) {
+                println!("Adding new Player");
+                (true, Response::Accepted)
+            } else {
+                println!("Rejecting new Player");
+                (false, Response::Rejected(RejectReason::MaxPlayersReached))
+            }
+        });
+    }
 }
 
 fn clean_up(

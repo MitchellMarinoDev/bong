@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 bevy = { version = "0.7.0", features = ["bevy_dylib"] }
-carrier-pigeon = "0.2.0"
+carrier-pigeon = { git = "https://github.com/mitchellmarinodev/carrier-pigeon", rev = "c2ae8e08ceccdf3430f9fc9822b1cf91650225df" }
 serde = { version = "~1.0", features = ["derive"] }
 heron = { version = "3.0", features = ["2d"] }
 

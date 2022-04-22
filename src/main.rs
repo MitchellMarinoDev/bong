@@ -37,6 +37,9 @@ pub enum GameState {
     GameOver,
 }
 
+// TODO:
+//  Password.
+
 fn main() {
     let msg_table = MsgTable::new();
 
@@ -52,7 +55,6 @@ fn main() {
             mode: bevy::window::WindowMode::Windowed,
             ..Default::default()
         })
-
         .add_state(GameState::Menu)
         .add_plugins(DefaultPlugins)
         .add_plugin(PhysicsPlugin::default())
