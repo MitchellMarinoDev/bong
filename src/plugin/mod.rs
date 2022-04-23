@@ -4,7 +4,6 @@ use bevy::prelude::*;
 use crate::plugin::tick::{client_tick, server_tick};
 
 mod tick;
-mod run_criteria;
 
 pub struct ClientPlugin <
     C: Any + Send + Sync,

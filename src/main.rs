@@ -8,6 +8,7 @@ use bevy::prelude::*;
 use crate::messages::{Connection, Disconnect, Response};
 use crate::plugin::{ClientPlugin, ServerPlugin};
 use bevy::render::camera::ScalingMode;
+use bevy_editor_pls::EditorPlugin;
 use heron::prelude::*;
 use crate::game::GamePlugin;
 use crate::lobby::LobbyPlugin;
@@ -50,6 +51,7 @@ fn main() {
         })
         .add_state(GameState::Menu)
         .add_plugins(DefaultPlugins)
+        .add_plugin(EditorPlugin)
         .add_plugin(PhysicsPlugin::default())
         .add_plugin(ClientPlugin::<Connection, Response, Disconnect>::default())
         .add_plugin(ServerPlugin::<Connection, Response, Disconnect>::default())
@@ -57,7 +59,7 @@ fn main() {
         .add_plugin(MenuPlugin)
         .add_plugin(LobbyPlugin)
 
-        .add_system(setup)
+        .add_startup_system(setup)
         .run();
 }
 

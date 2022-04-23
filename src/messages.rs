@@ -61,6 +61,11 @@ pub fn get_parts() -> MsgTableParts {
     let mut table = MsgTable::new();
     table.register::<ConnectionBroadcast>(Transport::TCP).unwrap();
     table.register::<DisconnectBroadcast>(Transport::TCP).unwrap();
+    table.register::<StartGame>(Transport::TCP).unwrap();
 
     table.build().unwrap()
 }
+
+/// A message that indicates that the game has been started by the server.
+#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
+pub struct StartGame;

@@ -1,7 +1,9 @@
+use std::f32::consts::PI;
 use bevy::prelude::*;
+use bevy::prelude::PositionType::Absolute;
 use carrier_pigeon::CId;
 use crate::{Client, Connection, GameState, MsgTableParts, MultiplayerType, OptionPendingClient, Response, Server};
-use crate::messages::{ConnectionBroadcast, DisconnectBroadcast, RejectReason};
+use crate::messages::{ConnectionBroadcast, DisconnectBroadcast, RejectReason, StartGame};
 
 pub struct LobbyPlugin;
 
@@ -23,6 +25,13 @@ enum Player {
     Two,
 }
 
+#[derive(Component)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+enum LobbyButton {
+    Back,
+    Start,
+}
+
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
 struct Players {
     p1: Option<(CId, String)>,
@@ -30,6 +39,14 @@ struct Players {
 }
 
 impl Players {
+    fn first(&self) -> Option<(CId, String)> {
+        if self.p1.is_some() {
+            self.p1.clone()
+        } else {
+            self.p2.clone()
+        }
+    }
+
     fn count(&self) -> usize {
         match (&self.p1, &self.p2) {
             (None, None) => 0,
@@ -37,21 +54,6 @@ impl Players {
             (None, Some(_)) => 1,
             (Some(_), Some(_)) => 2,
         }
-    }
-
-    fn cid(&self, cid: CId) -> Option<String> {
-        if let Some((c, s)) = &self.p1 {
-            if *c == cid {
-                return Some(s.clone());
-            }
-        }
-        if let Some((c, s)) = &self.p2 {
-            if *c == cid {
-                return Some(s.clone());
-            }
-        }
-
-        None
     }
 
     fn remove_cid(&mut self, cid: CId) -> bool {
@@ -92,7 +94,6 @@ impl Players {
 impl Plugin for LobbyPlugin {
     fn build(&self, app: &mut App) {
         app
-            .insert_resource(Players::default())
             .add_system_set(
                 SystemSet::on_enter(GameState::Lobby)
                     .with_system(setup_networking)
@@ -163,28 +164,47 @@ fn setup_lobby_ui(
     assets: Res<AssetServer>,
 ) {
     println!("Setting up lobby");
+
+    commands.insert_resource(Players::default());
+
     let font = assets.load("FiraMono-Medium.ttf");
+    let arrow = assets.load("arrow.png");
     let text_style = TextStyle {
         font,
         color: Color::BLACK,
         font_size: 60.0,
     };
     let button_style = Style {
-        size: Size::new(Val::Px(1000.0), Val::Px(100.0)),
-        margin: Rect::all(Val::Px(20.0)),
+        size: Size::new(Val::Px(64.0), Val::Px(64.0)),
+        // margin: Rect::all(Val::Px(20.0)),
+        margin: Rect{ top: Val::Px(10.0), left: Val::Px(10.0), bottom: Val::Auto, right: Val::Auto },
         justify_content: JustifyContent::Center,
         align_items: AlignItems::Center,
-        ..default()
+        ..Default::default()
     };
+
+    // back button
+    commands
+        .spawn_bundle(ButtonBundle {
+            color: UiColor(Color::WHITE),
+            style: button_style.clone(),
+            image: arrow.clone().into(),
+            ..Default::default()
+        })
+        .insert(LobbyItem)
+        .insert(LobbyButton::Back);
 
     // parent
     commands
         .spawn_bundle(NodeBundle {
             style: Style {
+                position_type: Absolute,
                 margin: Rect::all(Val::Auto),
                 padding: Rect::all(Val::Px(10.0)),
                 flex_direction: FlexDirection::ColumnReverse,
                 align_items: AlignItems::Center,
+                align_self: AlignSelf::Center,
+                size: Size { width: Val::Percent(100.0), height: Val::Auto },
                 ..default()
             },
             color: Color::CRIMSON.into(),
@@ -244,6 +264,21 @@ fn setup_lobby_ui(
                     }).insert(Player::Two);
                 })
             ;
+
+            // Start Arrow
+            cb
+                .spawn_bundle(ButtonBundle {
+                    color: UiColor(Color::WHITE),
+                    style: Style {
+                        margin: Rect{ top: Val::Px(10.0), left: Val::Auto, bottom: Val::Auto, right: Val::Px(10.0) },
+                        ..button_style.clone()
+                    },
+                    transform: Transform::from_rotation(Quat::from_axis_angle(Vec3::Z, PI)),
+                    image: arrow.into(),
+                    ..Default::default()
+                })
+                .insert(LobbyItem)
+                .insert(LobbyButton::Start);
         })
     ;
 }
@@ -299,18 +334,26 @@ fn update_player_labels(
 }
 
 fn handle_ui(
-    // q_interaction: Query<(&Interaction, &MenuButton), Changed<Interaction>>,
-    // mut game_state: ResMut<State<GameState>>,
+    q_interaction: Query<(&Interaction, &LobbyButton), Changed<Interaction>>,
+    mut game_state: ResMut<State<GameState>>,
+    players: Res<Players>,
+    mut server: Option<ResMut<Server>>
 ) {
-    // for (interaction, menu_button) in q_interaction.iter() {
-    //     if *interaction == Interaction::Clicked {
-    //         match menu_button {
-    //             MenuButton::Server => game_state.set(GameState::Lobby(MultiplayerType::Server)).unwrap(),
-    //             MenuButton::Host   => game_state.set(GameState::Lobby(MultiplayerType::Host)).unwrap(),
-    //             MenuButton::Client => game_state.set(GameState::Lobby(MultiplayerType::Client)).unwrap(),
-    //         }
-    //     }
-    // }
+    for (interaction, button) in q_interaction.iter() {
+        if *interaction == Interaction::Clicked {
+            match button {
+                LobbyButton::Back => { let _ = game_state.set(GameState::Menu); },
+                LobbyButton::Start => {
+                    if let Some(server) = &mut server {
+                        if players.count() == 2 {
+                            let _ = game_state.set(GameState::Game);
+                            server.broadcast(&StartGame).unwrap();
+                        }
+                    }
+                },
+            }
+        }
+    }
 }
 
 fn handle_connections(
@@ -359,7 +402,7 @@ fn handle_disconnections(
         }
     } else if let Some(client) = client {
         for msg in client.recv::<DisconnectBroadcast>().unwrap() {
-            println!("Disconnection boradaojacast recieved.");
+            println!("Disconnection broadcast received.");
             players.remove_cid(msg.cid);
         }
     }

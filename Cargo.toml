@@ -10,6 +10,7 @@ bevy = { version = "0.7.0", features = ["bevy_dylib"] }
 carrier-pigeon = { git = "https://github.com/mitchellmarinodev/carrier-pigeon", rev = "917ead9491bbbe2a1008a88e6b1cd87b86accb18" }
 serde = { version = "~1.0", features = ["derive"] }
 heron = { version = "3.0", features = ["2d"] }
+bevy_editor_pls = { git = "https://github.com/jakobhellermann/bevy_editor_pls.git" }
 
 [profile.dev.package."*"]
 opt-level = 3

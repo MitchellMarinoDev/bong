@@ -1,5 +1,6 @@
 use bevy::prelude::*;
-use crate::{GameState, MultiplayerType};
+use bevy::prelude::PositionType::Absolute;
+use crate::{Client, GameState, MultiplayerType, Server};
 
 pub struct MenuPlugin;
 
@@ -58,9 +59,12 @@ fn setup_menu(
     commands
         .spawn_bundle(NodeBundle {
             style: Style {
+                position_type: Absolute,
                 margin: Rect::all(Val::Auto),
                 flex_direction: FlexDirection::ColumnReverse,
                 align_items: AlignItems::Center,
+                align_self: AlignSelf::Center,
+                size: Size { width: Val::Percent(100.0), height: Val::Auto },
                 ..default()
             },
             color: Color::CRIMSON.into(),
@@ -128,6 +132,9 @@ fn handle_ui(
                 MenuButton::Host   => commands.insert_resource(MultiplayerType::Host),
                 MenuButton::Client => commands.insert_resource(MultiplayerType::Client),
             }
+            // Destroy the client/server when returning to the menu.
+            commands.remove_resource::<Client>();
+            commands.remove_resource::<Server>();
             game_state.set(GameState::Lobby).unwrap()
         }
     }
