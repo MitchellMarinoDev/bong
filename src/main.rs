@@ -6,7 +6,7 @@ mod lobby;
 
 use bevy::prelude::*;
 use crate::messages::{Connection, Disconnect, Response};
-use crate::plugin::{ClientPlugin, ServerPlugin};
+use crate::plugin::{AppExt, ClientPlugin, ServerPlugin};
 use bevy::render::camera::ScalingMode;
 use bevy_editor_pls::EditorPlugin;
 use heron::prelude::*;
@@ -59,9 +59,17 @@ pub enum GameState {
 }
 
 fn main() {
-    let parts = messages::get_parts();
+    let mut table = messages::get_table();
 
-    App::new()
+    let mut app = App::new();
+    app
+        .register_net_comp::<Transform>(&mut table)
+        .register_net_comp::<Velocity>(&mut table)
+    ;
+
+    let parts = table.build::<Connection, Response, Disconnect>().unwrap();
+
+    app
         .insert_resource(parts)
 
         .insert_resource(WindowDescriptor {

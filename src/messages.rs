@@ -57,13 +57,13 @@ pub struct Disconnect {
 
 }
 
-pub fn get_parts() -> MsgTableParts {
+pub fn get_table() -> MsgTable {
     let mut table = MsgTable::new();
     table.register::<ConnectionBroadcast>(Transport::TCP).unwrap();
     table.register::<DisconnectBroadcast>(Transport::TCP).unwrap();
     table.register::<StartGame>(Transport::TCP).unwrap();
 
-    table.build().unwrap()
+    table
 }
 
 /// A message that indicates that the game has been started by the server.

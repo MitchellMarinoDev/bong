@@ -376,7 +376,7 @@ fn handle_connections(
     if let Some(mut server) = server {
         let mut broadcasts = vec![];
         server.handle_new_cons(&mut |cid, c| {
-            let existing_player = players.p1.clone();
+            let existing_player = players.first();
             if players.add(cid, c.name.clone()) {
                 println!("Adding new Player");
                 broadcasts.push(ConnectionBroadcast::new(c.name, cid));
