@@ -7,8 +7,6 @@ mod tick;
 mod net_comp;
 mod net;
 
-pub use run_criteria::*;
-
 pub struct ClientPlugin <
     C: Any + Send + Sync,
     R: Any + Send + Sync,
