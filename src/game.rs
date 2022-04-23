@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use heron::*;
-use crate::GameState;
+use crate::{GameState, MultiplayerType};
 
 pub struct GamePlugin;
 
@@ -189,11 +189,15 @@ fn setup_bricks(
 }
 
 fn break_bricks(
+    multiplayer_type: Res<MultiplayerType>,
     q_ball: Query<Entity, With<Ball>>,
     q_brick: Query<(), With<Brick>>,
     mut collisions: EventReader<CollisionEvent>,
     mut commands: Commands,
 ) {
+    // Only run on server
+    if !multiplayer_type.is_server() { return; }
+
     let ball = q_ball.single();
     for event in collisions.iter() {
         match event {

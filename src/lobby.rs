@@ -102,6 +102,7 @@ impl Plugin for LobbyPlugin {
             .add_system_set(
                 SystemSet::on_update(GameState::Lobby)
                     .with_system(handle_ui)
+                    .with_system(game_start)
                     .with_system(connect_client)
                     .with_system(handle_connections)
                     .with_system(handle_disconnections)
@@ -281,6 +282,17 @@ fn setup_lobby_ui(
                 .insert(LobbyButton::Start);
         })
     ;
+}
+
+fn game_start(
+    client: Option<Res<Client>>,
+    mut game_state: ResMut<State<GameState>>,
+) {
+    if let Some(client) = client {
+        if client.recv::<StartGame>().unwrap().count() >= 1 {
+            let _ = game_state.set(GameState::Game);
+        }
+    }
 }
 
 fn update_status(

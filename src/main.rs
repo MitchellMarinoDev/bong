@@ -26,6 +26,26 @@ pub enum MultiplayerType {
     Client,
 }
 
+impl MultiplayerType {
+    /// Whether this is a server type (`Server` or `Host`).
+    pub fn is_server(&self) -> bool {
+        match self {
+            MultiplayerType::Server => true,
+            MultiplayerType::Host   => true,
+            MultiplayerType::Client => false,
+        }
+    }
+
+    /// Whether this is a client type (`Client` or `Host`).
+    pub fn is_client(&self) -> bool {
+        match self {
+            MultiplayerType::Server => false,
+            MultiplayerType::Host   => true,
+            MultiplayerType::Client => true,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub enum GameState {
     /// Menu.
