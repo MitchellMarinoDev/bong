@@ -1,9 +1,9 @@
 use std::any::Any;
 use std::marker::PhantomData;
 use bevy::prelude::*;
-use crate::plugin::recv::{client_recv, server_recv};
+use crate::plugin::tick::{client_tick, server_tick};
 
-mod recv;
+mod tick;
 mod run_criteria;
 
 pub struct ClientPlugin <
@@ -26,7 +26,7 @@ where
 {
     fn build(&self, app: &mut App) {
         app
-            .add_system_to_stage(CoreStage::First, client_recv::<C, R, D>)
+            .add_system_to_stage(CoreStage::First, client_tick::<C, R, D>)
         ;
     }
 }
@@ -39,29 +39,18 @@ impl<C, R, D> Plugin for ServerPlugin<C, R, D>
 {
     fn build(&self, app: &mut App) {
         app
-            .add_system_to_stage(CoreStage::First, server_recv::<C, R, D>)
+            .add_system_to_stage(CoreStage::First, server_tick::<C, R, D>)
         ;
     }
 }
 
-impl<C, R, D> ServerPlugin<C, R, D>
+impl<C, R, D> Default for ServerPlugin<C, R, D>
     where
         C: Any + Send + Sync,
         R: Any + Send + Sync,
         D: Any + Send + Sync,
 {
-    pub fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<C, R, D> ClientPlugin<C, R, D>
-    where
-        C: Any + Send + Sync,
-        R: Any + Send + Sync,
-        D: Any + Send + Sync,
-{
-    pub fn new() -> Self {
+    fn default() -> Self {
         Self(PhantomData)
     }
 }

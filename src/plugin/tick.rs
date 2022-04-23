@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use std::any::Any;
 use carrier_pigeon::{Client, Server};
 
-pub fn client_recv<C, R, D> (
+pub fn client_tick<C, R, D> (
     client: Option<ResMut<Client<C, R, D>>>,
 )
 where
@@ -16,7 +16,7 @@ where
     }
 }
 
-pub fn server_recv<C, R, D> (
+pub fn server_tick<C, R, D> (
     server: Option<ResMut<Server<C, R, D>>>,
 )
     where

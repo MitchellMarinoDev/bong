@@ -6,15 +6,15 @@ mod lobby;
 
 use bevy::prelude::*;
 use crate::messages::{Connection, Disconnect, Response};
-use crate::plugin::ClientPlugin;
+use crate::plugin::{ClientPlugin, ServerPlugin};
 use bevy::render::camera::ScalingMode;
-use carrier_pigeon::MsgTable;
 use heron::prelude::*;
 use crate::game::GamePlugin;
 use crate::lobby::LobbyPlugin;
 use crate::menu::MenuPlugin;
 
 pub type Client = carrier_pigeon::Client<Connection, Response, Disconnect>;
+pub type OptionPendingClient = carrier_pigeon::OptionPendingClient<Connection, Response, Disconnect>;
 pub type Server = carrier_pigeon::Server<Connection, Response, Disconnect>;
 pub type MsgTableParts = carrier_pigeon::MsgTableParts<Connection, Response, Disconnect>;
 
@@ -37,15 +37,8 @@ pub enum GameState {
     GameOver,
 }
 
-// TODO:
-//  Password.
-
 fn main() {
-    let msg_table = MsgTable::new();
-
-    // TODO: register msg types.
-
-    let parts: MsgTableParts = msg_table.build().unwrap();
+    let parts = messages::get_parts();
 
     App::new()
         .insert_resource(parts)
@@ -59,6 +52,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(PhysicsPlugin::default())
         .add_plugin(ClientPlugin::<Connection, Response, Disconnect>::default())
+        .add_plugin(ServerPlugin::<Connection, Response, Disconnect>::default())
         .add_plugin(GamePlugin)
         .add_plugin(MenuPlugin)
         .add_plugin(LobbyPlugin)

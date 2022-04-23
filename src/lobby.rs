@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use carrier_pigeon::CId;
-use crate::{Client, Connection, GameState, MsgTableParts, MultiplayerType, Response, Server};
-use crate::messages::RejectReason;
+use crate::{Client, Connection, GameState, MsgTableParts, MultiplayerType, OptionPendingClient, Response, Server};
+use crate::messages::{ConnectionBroadcast, RejectReason};
 
 pub struct LobbyPlugin;
 
@@ -66,6 +66,7 @@ impl Plugin for LobbyPlugin {
             .add_system_set(
                 SystemSet::on_update(GameState::Lobby)
                     .with_system(handle_ui)
+                    .with_system(connect_client)
                     .with_system(handle_connections)
                     .with_system(update_status)
                     .with_system(update_player_labels)
@@ -91,11 +92,32 @@ fn setup_networking(
         MultiplayerType::Host => {
             println!("host");
             commands.insert_resource(Server::new("127.0.0.1:5599".parse().unwrap(), parts.clone()).unwrap());
-            commands.insert_resource(Client::new("127.0.0.1:5599".parse().unwrap(), parts.clone(), Connection::new("name")));
+            commands.insert_resource(Client::new("127.0.0.1:5599".parse().unwrap(), parts.clone(), Connection::new("Host")).option());
         }
         MultiplayerType::Client => {
             println!("client");
-            commands.insert_resource(Client::new("127.0.0.1:5599".parse().unwrap(), parts.clone(), Connection::new("name")));
+            commands.insert_resource(Client::new("127.0.0.1:5599".parse().unwrap(), parts.clone(), Connection::new("Client")).option());
+        }
+    }
+}
+
+fn connect_client(
+    pending: Option<ResMut<OptionPendingClient>>,
+    mut players: ResMut<Players>,
+    mut commands: Commands,
+) {
+    if let Some(mut pending) = pending {
+        if pending.done().unwrap() {
+            println!("Client Connected!");
+            if let Ok((client, resp)) = pending.take().unwrap().unwrap() {
+                if let Response::Accepted(cid, optional_player) = resp {
+                    if let Some(p) = optional_player {
+                        players.add(cid, p);
+                    }
+                }
+                commands.insert_resource(client);
+            }
+            commands.remove_resource::<OptionPendingClient>()
         }
     }
 }
@@ -257,18 +279,31 @@ fn handle_ui(
 
 fn handle_connections(
     server: Option<ResMut<Server>>,
+    client: Option<Res<Client>>,
     mut players: ResMut<Players>,
 ) {
     if let Some(mut server) = server {
+        let mut broadcasts = vec![];
         server.handle_new_cons(&mut |cid, c| {
-            if players.add(cid, c.name) {
+            let existing_player = players.p1.clone().map(|p| p.1);
+            if players.add(cid, c.name.clone()) {
                 println!("Adding new Player");
-                (true, Response::Accepted)
+                broadcasts.push(ConnectionBroadcast::new(c.name, cid));
+                (true, Response::Accepted(cid, existing_player))
             } else {
                 println!("Rejecting new Player");
                 (false, Response::Rejected(RejectReason::MaxPlayersReached))
             }
         });
+        for bm in broadcasts {
+            println!("Broadcasting");
+            server.broadcast(&bm).unwrap();
+        }
+    } else if let Some(client) = client {
+        for msg in client.recv::<ConnectionBroadcast>().unwrap() {
+            println!("Adding as client");
+            players.add(msg.cid, msg.name.clone());
+        }
     }
 }
 
