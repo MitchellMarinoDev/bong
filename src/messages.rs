@@ -42,7 +42,7 @@ pub struct DisconnectBroadcast {
 /// The response message.
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
 pub enum Response {
-    Accepted(CId, Option<String>),
+    Accepted(CId, Option<(CId, String)>),
     Rejected(RejectReason),
 }
 

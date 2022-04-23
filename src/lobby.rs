@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use carrier_pigeon::CId;
 use crate::{Client, Connection, GameState, MsgTableParts, MultiplayerType, OptionPendingClient, Response, Server};
-use crate::messages::{ConnectionBroadcast, RejectReason};
+use crate::messages::{ConnectionBroadcast, DisconnectBroadcast, RejectReason};
 
 pub struct LobbyPlugin;
 
@@ -39,7 +39,42 @@ impl Players {
         }
     }
 
+    fn cid(&self, cid: CId) -> Option<String> {
+        if let Some((c, s)) = &self.p1 {
+            if *c == cid {
+                return Some(s.clone());
+            }
+        }
+        if let Some((c, s)) = &self.p2 {
+            if *c == cid {
+                return Some(s.clone());
+            }
+        }
+
+        None
+    }
+
+    fn remove_cid(&mut self, cid: CId) -> bool {
+        if let Some((c, s)) = &self.p1 {
+            if *c == cid {
+                println!("Removing {}", s);
+                self.p1 = None;
+                return true;
+            }
+        }
+        if let Some((c, s)) = &self.p2 {
+            if *c == cid {
+                println!("Removing {}", s);
+                self.p2 = None;
+                return true;
+            }
+        }
+
+        false
+    }
+
     fn add(&mut self, cid: CId, name: String) -> bool {
+        println!("Adding player {} with cid  {}", name, cid);
         match (&self.p1, &self.p2) {
             (None, _) => {
                 self.p1 = Some((cid, name));
@@ -68,6 +103,7 @@ impl Plugin for LobbyPlugin {
                     .with_system(handle_ui)
                     .with_system(connect_client)
                     .with_system(handle_connections)
+                    .with_system(handle_disconnections)
                     .with_system(update_status)
                     .with_system(update_player_labels)
             )
@@ -108,11 +144,11 @@ fn connect_client(
 ) {
     if let Some(mut pending) = pending {
         if pending.done().unwrap() {
-            println!("Client Connected!");
             if let Ok((client, resp)) = pending.take().unwrap().unwrap() {
-                if let Response::Accepted(cid, optional_player) = resp {
-                    if let Some(p) = optional_player {
-                        players.add(cid, p);
+                println!("Client Connected!");
+                if let Response::Accepted(_this_cid, optional_player) = resp {
+                    if let Some((p_cid, p)) = optional_player {
+                        players.add(p_cid, p);
                     }
                 }
                 commands.insert_resource(client);
@@ -264,7 +300,7 @@ fn update_player_labels(
 
 fn handle_ui(
     // q_interaction: Query<(&Interaction, &MenuButton), Changed<Interaction>>,
-    mut game_state: ResMut<State<GameState>>,
+    // mut game_state: ResMut<State<GameState>>,
 ) {
     // for (interaction, menu_button) in q_interaction.iter() {
     //     if *interaction == Interaction::Clicked {
@@ -285,7 +321,7 @@ fn handle_connections(
     if let Some(mut server) = server {
         let mut broadcasts = vec![];
         server.handle_new_cons(&mut |cid, c| {
-            let existing_player = players.p1.clone().map(|p| p.1);
+            let existing_player = players.p1.clone();
             if players.add(cid, c.name.clone()) {
                 println!("Adding new Player");
                 broadcasts.push(ConnectionBroadcast::new(c.name, cid));
@@ -301,8 +337,30 @@ fn handle_connections(
         }
     } else if let Some(client) = client {
         for msg in client.recv::<ConnectionBroadcast>().unwrap() {
-            println!("Adding as client");
             players.add(msg.cid, msg.name.clone());
+        }
+    }
+}
+
+fn handle_disconnections(
+    server: Option<ResMut<Server>>,
+    client: Option<Res<Client>>,
+    mut players: ResMut<Players>,
+) {
+    if let Some(mut server) = server {
+        let mut broadcasts = vec![];
+        server.handle_disconnects(&mut |cid, _status| {
+            broadcasts.push(DisconnectBroadcast{ cid });
+            players.remove_cid(cid);
+        });
+        for bm in broadcasts {
+            println!("Broadcasting");
+            server.broadcast(&bm).unwrap();
+        }
+    } else if let Some(client) = client {
+        for msg in client.recv::<DisconnectBroadcast>().unwrap() {
+            println!("Disconnection boradaojacast recieved.");
+            players.remove_cid(msg.cid);
         }
     }
 }
