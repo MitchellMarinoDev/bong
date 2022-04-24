@@ -9,6 +9,7 @@ use bevy::prelude::*;
 use crate::messages::{Connection, Disconnect, MyTransform, MyVelocity, Response};
 use crate::plugin::{AppExt, ClientPlugin, ServerPlugin};
 use bevy::render::camera::ScalingMode;
+// use bevy_editor_pls::EditorPlugin;
 use carrier_pigeon::Transport;
 use heron::prelude::*;
 use crate::game::GamePlugin;
@@ -90,7 +91,6 @@ fn main() {
         })
         .add_state(GameState::Menu)
         .add_plugins(DefaultPlugins)
-        // .add_plugin(EditorPlugin)
         .add_plugin(PhysicsPlugin::default())
         .add_plugin(ClientPlugin)
         .add_plugin(ServerPlugin)

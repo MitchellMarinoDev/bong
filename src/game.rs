@@ -153,7 +153,7 @@ fn setup_game(
         .insert(RigidBody::Dynamic)
         .insert(PhysicMaterial { restitution: 1.0, ..Default::default() })
         .insert(RotationConstraints::lock())
-        .insert(Velocity::from_linear(Vec3::new(750.0, -500.0, 0.0)))
+        .insert(Velocity::from_linear(Vec3::new(750.0, 0.0, 0.0)))
         .insert(GameItem)
         .insert(Ball)
         .insert(Name::new("Ball"))
@@ -250,6 +250,7 @@ fn setup_bricks(
         .insert(Name::new("Bricks"))
         .insert(GlobalTransform::identity())
         .insert(Transform::identity())
+        .insert(GameItem)
         .push_children(&bricks[..]);
 }
 
@@ -524,7 +525,7 @@ fn leave_game_after_win(
 ) {
     if let Some(gw) = game_win {
         if gw.0.elapsed() > Duration::from_millis(3000) {
-            game_state.set(GameState::Menu);
+            let _ = game_state.set(GameState::Menu);
         }
     }
 }
@@ -558,4 +559,5 @@ fn clean_up(
     }
     commands.remove_resource::<Client>();
     commands.remove_resource::<Server>();
+    commands.remove_resource::<GameWinR>();
 }
