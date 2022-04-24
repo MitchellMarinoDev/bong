@@ -138,7 +138,9 @@ where
                     }
                 }
                 NetDirection::ToFrom(to_spec, from_spec) => {
-                    // TODO: log overlap
+                    if to_spec.overlaps(from_spec) {
+                        warn!("NetEntity {{ id: {} }} has overlapping `CIdSpec`s in NetDirection::ToFrom. Applying anyway.", net_e.id);
+                    }
                     // From
                     if let Some(&(_cid, valid_msg)) = msgs.iter().filter(|(cid, msg)| from_spec.matches(*cid) && msg.id == net_e.id).last() {
                         *comp = valid_msg.msg.clone().into();
