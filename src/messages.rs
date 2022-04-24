@@ -66,6 +66,7 @@ pub fn get_table() -> MsgTable {
     table.register::<ConnectionBroadcast>(Transport::TCP).unwrap();
     table.register::<DisconnectBroadcast>(Transport::TCP).unwrap();
     table.register::<StartGame>(Transport::TCP).unwrap();
+    table.register::<BrickBreak>(Transport::TCP).unwrap();
 
     table
 }
@@ -73,6 +74,9 @@ pub fn get_table() -> MsgTable {
 /// A message that indicates that the game has been started by the server.
 #[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
 pub struct StartGame;
+
+#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
+pub struct BrickBreak(pub u32);
 
 /// A reduced [`Transform`] component that can be networked.
 ///

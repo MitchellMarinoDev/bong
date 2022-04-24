@@ -213,9 +213,9 @@ fn setup_lobby_ui(
             ..default()
         })
         .insert(LobbyItem)
-        .with_children(|cb| {
+        .with_children(|parent| {
             // Title
-            cb.spawn_bundle(TextBundle {
+            parent.spawn_bundle(TextBundle {
                 style: Style {
                     margin: Rect{ bottom: Val::Px(0.0), ..Rect::all(Val::Px(20.0))},
                     ..Default::default()
@@ -225,7 +225,7 @@ fn setup_lobby_ui(
             });
 
             // Status
-            cb.spawn_bundle(TextBundle {
+            parent.spawn_bundle(TextBundle {
                 style: Style {
                     margin: Rect::all(Val::Px(10.0)),
                     ..Default::default()
@@ -235,7 +235,7 @@ fn setup_lobby_ui(
             }).insert(StatusLabel);
 
             // Players holder
-            cb
+            parent
                 .spawn_bundle(NodeBundle {
                     style: Style {
                         margin: Rect::all(Val::Auto),
@@ -246,8 +246,8 @@ fn setup_lobby_ui(
                     color: Color::WHITE.into(),
                     ..default()
                 })
-                .with_children(|cb| {
-                    cb.spawn_bundle(TextBundle {
+                .with_children(|parent| {
+                    parent.spawn_bundle(TextBundle {
                         text: Text::with_section("Player 1", text_style.clone(), TextAlignment::default()),
                         style: Style {
                             margin: Rect::all(Val::Px(40.0)),
@@ -256,7 +256,7 @@ fn setup_lobby_ui(
                         ..Default::default()
                     }).insert(Player::One);
 
-                    cb.spawn_bundle(TextBundle {
+                    parent.spawn_bundle(TextBundle {
                         text: Text::with_section("Player 2", text_style.clone(), TextAlignment::default()),
                         style: Style {
                             margin: Rect::all(Val::Px(40.0)),
@@ -268,7 +268,7 @@ fn setup_lobby_ui(
             ;
 
             // Start Arrow
-            cb
+            parent
                 .spawn_bundle(ButtonBundle {
                     color: UiColor(Color::WHITE),
                     style: Style {

@@ -71,8 +71,8 @@ fn setup_menu(
             ..default()
         })
         .insert(MenuItem)
-        .with_children(|cb| {
-            cb
+        .with_children(|parent| {
+            parent
                 .spawn_bundle(ButtonBundle {
                     color: UiColor(Color::rgb_u8(255, 255, 255)),
                     style: button_style.clone(),
@@ -80,14 +80,14 @@ fn setup_menu(
                     ..Default::default()
                 })
                 .insert(MenuButton::Server)
-                .with_children(|cb| {
-                    cb.spawn_bundle(TextBundle {
+                .with_children(|parent| {
+                    parent.spawn_bundle(TextBundle {
                         text: Text::with_section("Start Server", text_style.clone(), TextAlignment::default()),
                         ..Default::default()
                     });
                 });
 
-            cb
+            parent
                 .spawn_bundle(ButtonBundle {
                     color: UiColor(Color::rgb_u8(255, 255, 255)),
                     style: button_style.clone(),
@@ -95,14 +95,14 @@ fn setup_menu(
                     ..Default::default()
                 })
                 .insert(MenuButton::Host)
-                .with_children(|cb| {
-                    cb.spawn_bundle(TextBundle {
+                .with_children(|parent| {
+                    parent.spawn_bundle(TextBundle {
                         text: Text::with_section("Start Host", text_style.clone(), TextAlignment::default()),
                         ..Default::default()
                     });
                 });
 
-            cb
+            parent
                 .spawn_bundle(ButtonBundle {
                     color: UiColor(Color::rgb_u8(255, 255, 255)),
                     style: button_style,
@@ -110,8 +110,8 @@ fn setup_menu(
                     ..Default::default()
                 })
                 .insert(MenuButton::Client)
-                .with_children(|cb| {
-                    cb.spawn_bundle(TextBundle {
+                .with_children(|parent| {
+                    parent.spawn_bundle(TextBundle {
                         text: Text::with_section("Start Client", text_style, TextAlignment::default()),
                         ..Default::default()
                     });

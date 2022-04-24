@@ -8,6 +8,9 @@ mod net_comp;
 mod net;
 
 pub use net::AppExt;
+pub use net_comp::NetComp;
+pub use net::NetDirection;
+pub use net::NetEntity;
 
 pub struct ClientPlugin <
     C: Any + Send + Sync,

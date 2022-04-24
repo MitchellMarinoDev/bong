@@ -1,6 +1,12 @@
+use bevy::ecs::query::QueryEntityError;
 use bevy::prelude::*;
+use carrier_pigeon::net::CIdSpec;
+use CIdSpec::All;
 use heron::*;
-use crate::{GameState, MultiplayerType};
+use NetDirection::*;
+use crate::{Client, GameState, MultiplayerType, MyTransform, MyVelocity, Server};
+use crate::messages::BrickBreak;
+use crate::plugin::{NetComp, NetDirection, NetEntity};
 
 pub struct GamePlugin;
 
@@ -27,7 +33,7 @@ impl Plugin for GamePlugin {
 #[derive(Component)]
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 /// A brick that is destroyed when the ball hits it.
-pub struct Brick;
+pub struct Brick(pub u32);
 
 #[derive(Component)]
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
@@ -53,6 +59,7 @@ pub enum Team {
 
 fn setup_game(
     mut commands: Commands,
+    server: Option<Res<Server>>,
     assets: Res<AssetServer>,
 ) {
     // Walls
@@ -61,27 +68,32 @@ fn setup_game(
         .insert(GlobalTransform::default())
         .insert(RigidBody::Static)
         .insert(GameItem)
-        .with_children(|cb| {
+        .insert(Name::new("Walls"))
+        .with_children(|parent| {
             // Bottom
-            cb.spawn()
+            parent.spawn()
+                .insert(Name::new("Wall B"))
                 .insert(Transform::from_xyz(0.0, (-1080.0/2.0)-40.0, 0.0))
                 .insert(GlobalTransform::default())
                 .insert(CollisionShape::Cuboid { half_extends: Vec3::new(2000.0/2.0, 40.0, 0.0), border_radius: None });
 
             // Top
-            cb.spawn()
+            parent.spawn()
+                .insert(Name::new("Wall T"))
                 .insert(Transform::from_xyz(0.0, (1080.0/2.0)+40.0, 0.0))
                 .insert(GlobalTransform::default())
                 .insert(CollisionShape::Cuboid { half_extends: Vec3::new(2000.0/2.0, 40.0, 0.0), border_radius: None });
 
             // Left
-            cb.spawn()
+            parent.spawn()
+                .insert(Name::new("Wall L"))
                 .insert(Transform::from_xyz((-1920.0/2.0)-40.0, 0.0, 0.0))
                 .insert(GlobalTransform::default())
                 .insert(CollisionShape::Cuboid { half_extends: Vec3::new(40.0, 1160.0/2.0, 0.0), border_radius: None });
 
             // Right
-            cb.spawn()
+            parent.spawn()
+                .insert(Name::new("Wall R"))
                 .insert(Transform::from_xyz((1920.0/2.0)+40.0, 0.0, 0.0))
                 .insert(GlobalTransform::default())
                 .insert(CollisionShape::Cuboid { half_extends: Vec3::new(40.0, 1160.0/2.0, 0.0), border_radius: None });
@@ -91,7 +103,13 @@ fn setup_game(
     ;
 
     let ball_ico = assets.load("ball.png");
+
     // ball
+    let dir = if server.is_some() { To(All) } else { From(All) };
+    let velocity_comp = NetComp::<Velocity, MyVelocity>::new(dir);
+    let transform_comp = NetComp::<Transform, MyTransform>::new(dir);
+    println!("Dir: {:?}", dir);
+
     commands.spawn()
         .insert_bundle(SpriteBundle {
             sprite: Sprite {
@@ -110,6 +128,11 @@ fn setup_game(
         .insert(Velocity::from_linear(Vec3::new(750.0, -500.0, 0.0)))
         .insert(GameItem)
         .insert(Ball)
+        .insert(Name::new("Ball"))
+
+        .insert(velocity_comp)
+        .insert(transform_comp)
+        .insert(NetEntity::new(5768696975200910899))
     ;
 
     // Targets
@@ -132,6 +155,7 @@ fn setup_game(
         .insert(RotationConstraints::lock())
         .insert(GameItem)
         .insert(Target(Team::Left))
+        .insert(Name::new("Left Target"))
     ;
 
     commands.spawn()
@@ -151,12 +175,15 @@ fn setup_game(
         .insert(RotationConstraints::lock())
         .insert(GameItem)
         .insert(Target(Team::Right))
+        .insert(Name::new("Left Right"))
     ;
 }
 
 fn setup_bricks(
     mut commands: Commands,
 ) {
+    let mut id = 0;
+    let mut bricks = vec![];
     // Left
     let height = 108.0;
     let width = 60.0;
@@ -168,7 +195,8 @@ fn setup_bricks(
         let x = -500.0 - width * r as f32;
         for i in 1..=count {
             let h = i as f32 - (count+1) as f32 / 2.0;
-            spawn_brick(&mut commands, color, [x,  (h * height)].into(), width, height);
+            bricks.push(spawn_brick(&mut commands, color, [x,  (h * height)].into(), width, height, id));
+            id += 1;
         }
     }
 
@@ -183,43 +211,54 @@ fn setup_bricks(
         let x = 500.0 + width * r as f32;
         for i in 1..=count {
             let h = i as f32 - (count+1) as f32 / 2.0;
-            spawn_brick(&mut commands, color, [x,  (h * height)].into(), width, height);
+            bricks.push(spawn_brick(&mut commands, color, [x,  (h * height)].into(), width, height, id));
+            id += 1;
         }
     }
 }
 
 fn break_bricks(
-    multiplayer_type: Res<MultiplayerType>,
+    server: Option<Res<Server>>,
+    client: Option<Res<Client>>,
     q_ball: Query<Entity, With<Ball>>,
-    q_brick: Query<(), With<Brick>>,
+    q_brick: Query<(Entity, &Brick)>,
     mut collisions: EventReader<CollisionEvent>,
     mut commands: Commands,
 ) {
-    // Only run on server
-    if !multiplayer_type.is_server() { return; }
-
-    let ball = q_ball.single();
-    for event in collisions.iter() {
-        match event {
-            CollisionEvent::Stopped(d1, d2) => {
+    if let Some(server) = server {
+        // Break balls based on collision
+        let ball = q_ball.single();
+        for event in collisions.iter() {
+            if let CollisionEvent::Stopped(d1, d2) = event {
                 let e1 = d1.rigid_body_entity();
                 let e2 = d2.rigid_body_entity();
 
+                let brick_e2: Result<(Entity, &Brick), QueryEntityError> = q_brick.get(e2);
+                let brick_e1: Result<(Entity, &Brick), QueryEntityError> = q_brick.get(e1);
+
                 // e2 is a brick colliding with a ball
-                if e1 == ball && q_brick.get(e2).is_ok() {
+                if e1 == ball && brick_e2.is_ok() {
+                    server.broadcast(&BrickBreak(brick_e2.unwrap().1.0)).unwrap();
                     commands.entity(e2).despawn();
                 }
                 // e1 is a brick colliding with a ball
-                if e2 == ball && q_brick.get(e1).is_ok() {
+                if e2 == ball && brick_e1.is_ok() {
+                    server.broadcast(&BrickBreak(brick_e1.unwrap().1.0)).unwrap();
                     commands.entity(e1).despawn();
                 }
-            },
-            _ => {},
+            }
+        }
+    } else if let Some(client) = client {
+        let ids: Vec<_> = client.recv::<BrickBreak>().unwrap().map(|m| m.0).collect();
+        for (e, brick) in q_brick.iter() {
+            if ids.contains(&brick.0) {
+                commands.entity(e).despawn();
+            }
         }
     }
 }
 
-fn spawn_brick(commands: &mut Commands, color: Color, center: Vec2, width: f32, height: f32) {
+fn spawn_brick(commands: &mut Commands, color: Color, center: Vec2, width: f32, height: f32, id: u32) -> Entity {
     commands.spawn()
         .insert_bundle(SpriteBundle {
             sprite: Sprite {
@@ -234,8 +273,9 @@ fn spawn_brick(commands: &mut Commands, color: Color, center: Vec2, width: f32, 
         .insert(PhysicMaterial { restitution: 1.0, ..Default::default() })
         .insert(RigidBody::Static)
         .insert(GameItem)
-        .insert(Brick)
-    ;
+        .insert(Brick(id))
+        .insert(Name::new("Brick"))
+        .id()
 }
 
 fn clean_up(

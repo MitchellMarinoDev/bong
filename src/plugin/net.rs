@@ -33,7 +33,15 @@ pub enum NetDirection {
 pub struct NetEntity {
     /// A unique identifier that needs to be the same on all connected instances of the game.
     /// A random `u64` provides a very low collision rate.
-    id: u64,
+    pub id: u64,
+}
+
+impl NetEntity {
+    pub fn new(id: u64) -> Self {
+        NetEntity {
+            id
+        }
+    }
 }
 
 /// The message type to be sent.
@@ -58,9 +66,6 @@ impl<M: Any + Send + Sync> NetCompMsg<M> {
 
 /// An extension trait for easy registering [`NetComp`] types.
 pub trait AppExt {
-    /// Registers a Network Component type `T`.
-    ///
-    /// Adds the required system to the app, and registers `T` into the `table`.
     fn register_net_comp<T, C, R, D>(&mut self, table: &mut MsgTable, transport: Transport) -> &mut Self
         where
             T: Any + Send + Sync + Serialize + DeserializeOwned + Component + Clone,
@@ -69,13 +74,10 @@ pub trait AppExt {
             D: Any + Send + Sync,
     ;
 
-    /// Registers a Network Component type `T` to be sent with type `M`.
-    ///
-    /// Adds the required system to the app, and registers `M` into the `table`.
     fn register_net_comp_custom<T, M, C, R, D>(&mut self, table: &mut MsgTable, transport: Transport) -> &mut Self
     where
-        T: Into<M> + Component,
-        M: Any + Send + Sync + Serialize + DeserializeOwned,
+        T: Into<M> + Component + Clone,
+        M: Any + Send + Sync + Into<T> + Serialize + DeserializeOwned + Clone,
         C: Any + Send + Sync,
         R: Any + Send + Sync,
         D: Any + Send + Sync,
@@ -83,11 +85,11 @@ pub trait AppExt {
 }
 
 impl AppExt for App {
-    /// Registers the type `T` into `table` and adds the
+    /// Registers the type `NetCompMsg<T>` into `table` and adds the
     /// system required to sync components of type `T`.
     ///
     /// ### Panics
-    /// panics if `T` is already registered.
+    /// panics if `NetCompMsg<T>` is already registered.
     fn register_net_comp<T, C, R, D>(&mut self, table: &mut MsgTable, transport: Transport) -> &mut Self
     where
         T: Any + Send + Sync + Serialize + DeserializeOwned + Component + Clone,
@@ -100,16 +102,16 @@ impl AppExt for App {
         self.add_system(network_comp_sys::<T, C, R, D>)
     }
 
-    /// Registers the type `M` into `table` and adds the
+    /// Registers the type `NetCompMsg<M>` into `table` and adds the
     /// system required to sync components of type `T`,
     /// using type `M` to send.
     ///
     /// ### Panics
-    /// panics if `T` is already registered.
+    /// panics if `NetCompMsg<M>` is already registered.
     fn register_net_comp_custom<T, M, C, R, D>(&mut self, table: &mut MsgTable, transport: Transport) -> &mut Self
         where
-            T: Into<M> + Component,
-            M: Any + Send + Sync + Serialize + DeserializeOwned,
+            T: Into<M> + Component + Clone,
+            M: Any + Send + Sync + Into<T> + Serialize + DeserializeOwned + Clone,
             C: Any + Send + Sync,
             R: Any + Send + Sync,
             D: Any + Send + Sync,
@@ -175,14 +177,55 @@ where
 }
 
 fn network_comp_sys_custom<T, M, C, R, D> (
-
+    server: Option<ResMut<Server<C, R, D>>>,
+    client: Option<ResMut<Client<C, R, D>>>,
+    mut q: Query<(&NetEntity, &NetComp<T, M>, &mut T)>,
+    // Add option for sending changed only.
 )
 where
-    T: Into<M> + Component,
-    M: Any + Send + Sync + Serialize + DeserializeOwned,
+    T: Into<M> + Component + Clone,
+    M: Any + Send + Sync + Into<T> + Serialize + DeserializeOwned + Clone,
     C: Any + Send + Sync,
     R: Any + Send + Sync,
     D: Any + Send + Sync,
 {
-
+    if let Some(mut server) = server {
+        let msgs: Vec<(CId, &NetCompMsg<M>)> = server.recv::<NetCompMsg<M>>().unwrap().collect();
+        for (net_e, net_c, mut comp) in q.iter_mut() {
+            match net_c.dir {
+                NetDirection::From(spec) => {
+                    // Get the last message that matches with the entity and CIdSpec
+                    if let Some(&(_cid, valid_msg)) = msgs.iter().filter(|(cid, msg)| spec.matches(*cid) && msg.id == net_e.id).last() {
+                        *comp = valid_msg.msg.clone().into();
+                    }
+                }
+                NetDirection::To(spec) => {
+                    // TODO: handle potential error.
+                    server.send_spec(&NetCompMsg::<M>::new(net_e.id, comp.clone().into()), spec).unwrap();
+                }
+                NetDirection::ToFrom(to_spec, from_spec) => {
+                    todo!()
+                }
+            }
+        }
+    } else if let Some(mut client) = client {
+        let msgs: Vec<&NetCompMsg<M>> = client.recv::<NetCompMsg<M>>().unwrap().collect();
+        for (net_e, net_c, mut comp) in q.iter_mut() {
+            match net_c.dir {
+                NetDirection::From(_) => {
+                    // Get the last message that matches with the entity and CIdSpec
+                    if let Some(&valid_msg) = msgs.iter().filter(|msg| msg.id == net_e.id).last() {
+                        *comp = valid_msg.msg.clone().into();
+                    }
+                }
+                NetDirection::To(_) => {
+                    // TODO: handle potential error.
+                    client.send(&NetCompMsg::<M>::new(net_e.id, comp.clone().into())).unwrap();
+                }
+                NetDirection::ToFrom(_, _) => {
+                    todo!()
+                }
+            }
+        }
+    }
 }

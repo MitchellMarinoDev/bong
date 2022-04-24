@@ -26,7 +26,7 @@ where
     fn default() -> Self {
         NetComp {
             dir: From(All),
-            _pd: PhantomData::default(),
+            _pd: PhantomData,
         }
     }
 }
@@ -36,7 +36,7 @@ impl<T, M> NetComp<T, M>
         T: Any + Send + Send + Into<M> + Component,
         M: Any + Send + Send,
 {
-    fn new(dir: NetDirection) -> Self {
+    pub fn new(dir: NetDirection) -> Self {
         NetComp {
             dir,
             _pd: PhantomData::default(),
