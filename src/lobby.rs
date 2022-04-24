@@ -1,9 +1,9 @@
 use std::f32::consts::PI;
 use bevy::prelude::*;
 use bevy::prelude::PositionType::Absolute;
-use carrier_pigeon::CId;
+use carrier_pigeon::{CId, Client, MsgTableParts, OptionPendingClient, Server};
 use carrier_pigeon::net::CIdSpec;
-use crate::{Client, Connection, GameState, MsgTableParts, MultiplayerType, OptionPendingClient, Response, Server};
+use crate::{Connection, GameState, MultiplayerType, Response};
 use crate::messages::{ConnectionBroadcast, DisconnectBroadcast, RejectReason, StartGame};
 
 pub struct LobbyPlugin;
@@ -147,7 +147,7 @@ fn connect_client(
 ) {
     if let Some(mut pending) = pending {
         if pending.done().unwrap() {
-            if let Ok((client, resp)) = pending.take().unwrap().unwrap() {
+            if let Ok((client, resp)) = pending.take::<Response>().unwrap() {
                 println!("Client Connected!");
                 if let Response::Accepted(_this_cid, optional_player) = resp {
                     if let Some((p_cid, p)) = optional_player {
@@ -376,7 +376,7 @@ fn handle_connections(
 ) {
     if let Some(mut server) = server {
         let mut broadcasts = vec![];
-        server.handle_new_cons(&mut |cid, c| {
+        server.handle_new_cons::<Connection, Response>(&mut |cid, c| {
             let existing_player = players.first();
             if players.add(cid, c.name.clone()) {
                 println!("Adding new Player");

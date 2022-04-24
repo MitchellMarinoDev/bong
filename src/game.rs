@@ -1,10 +1,11 @@
 use bevy::ecs::query::QueryEntityError;
 use bevy::prelude::*;
 use carrier_pigeon::net::CIdSpec;
+use carrier_pigeon::{Client, Server};
 use CIdSpec::All;
 use heron::*;
 use NetDirection::*;
-use crate::{Client, GameState, MyTransform, MyVelocity, Server};
+use crate::{GameState, MyTransform, MyVelocity};
 use crate::messages::BrickBreak;
 use crate::plugin::{NetComp, NetDirection, NetEntity};
 

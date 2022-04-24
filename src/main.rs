@@ -15,11 +15,6 @@ use crate::game::GamePlugin;
 use crate::lobby::LobbyPlugin;
 use crate::menu::MenuPlugin;
 
-pub type Client = carrier_pigeon::Client<Connection, Response, Disconnect>;
-pub type OptionPendingClient = carrier_pigeon::OptionPendingClient<Connection, Response, Disconnect>;
-pub type Server = carrier_pigeon::Server<Connection, Response, Disconnect>;
-pub type MsgTableParts = carrier_pigeon::MsgTableParts<Connection, Response, Disconnect>;
-
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub enum MultiplayerType {
     Server,
@@ -64,8 +59,8 @@ fn main() {
 
     let mut app = App::new();
     app
-        .register_net_comp_custom::<Transform, MyTransform, Connection, Response, Disconnect>(&mut table, Transport::UDP)
-        .register_net_comp_custom::<Velocity, MyVelocity, Connection, Response, Disconnect>(&mut table, Transport::UDP)
+        .register_net_comp_custom::<Transform, MyTransform>(&mut table, Transport::UDP)
+        .register_net_comp_custom::<Velocity, MyVelocity>(&mut table, Transport::UDP)
     ;
 
     let parts = table.build::<Connection, Response, Disconnect>().unwrap();
@@ -82,8 +77,8 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(EditorPlugin)
         .add_plugin(PhysicsPlugin::default())
-        .add_plugin(ClientPlugin::<Connection, Response, Disconnect>::default())
-        .add_plugin(ServerPlugin::<Connection, Response, Disconnect>::default())
+        .add_plugin(ClientPlugin)
+        .add_plugin(ServerPlugin)
         .add_plugin(GamePlugin)
         .add_plugin(MenuPlugin)
         .add_plugin(LobbyPlugin)

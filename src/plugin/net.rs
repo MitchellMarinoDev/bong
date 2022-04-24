@@ -66,21 +66,15 @@ impl<M: Any + Send + Sync> NetCompMsg<M> {
 
 /// An extension trait for easy registering [`NetComp`] types.
 pub trait AppExt {
-    fn register_net_comp<T, C, R, D>(&mut self, table: &mut MsgTable, transport: Transport) -> &mut Self
+    fn register_net_comp<T>(&mut self, table: &mut MsgTable, transport: Transport) -> &mut Self
         where
             T: Any + Send + Sync + Serialize + DeserializeOwned + Component + Clone,
-            C: Any + Send + Sync,
-            R: Any + Send + Sync,
-            D: Any + Send + Sync,
     ;
 
-    fn register_net_comp_custom<T, M, C, R, D>(&mut self, table: &mut MsgTable, transport: Transport) -> &mut Self
+    fn register_net_comp_custom<T, M>(&mut self, table: &mut MsgTable, transport: Transport) -> &mut Self
     where
         T: Into<M> + Component + Clone,
         M: Any + Send + Sync + Into<T> + Serialize + DeserializeOwned + Clone,
-        C: Any + Send + Sync,
-        R: Any + Send + Sync,
-        D: Any + Send + Sync,
     ;
 }
 
@@ -90,16 +84,13 @@ impl AppExt for App {
     ///
     /// ### Panics
     /// panics if `NetCompMsg<T>` is already registered.
-    fn register_net_comp<T, C, R, D>(&mut self, table: &mut MsgTable, transport: Transport) -> &mut Self
+    fn register_net_comp<T>(&mut self, table: &mut MsgTable, transport: Transport) -> &mut Self
     where
         T: Any + Send + Sync + Serialize + DeserializeOwned + Component + Clone,
-        C: Any + Send + Sync,
-        R: Any + Send + Sync,
-        D: Any + Send + Sync,
     {
         // TODO: make a version that doesnt panic.
         table.register::<NetCompMsg<T>>(transport).unwrap();
-        self.add_system(network_comp_sys::<T, C, R, D>)
+        self.add_system(network_comp_sys::<T>)
     }
 
     /// Registers the type `NetCompMsg<M>` into `table` and adds the
@@ -108,34 +99,28 @@ impl AppExt for App {
     ///
     /// ### Panics
     /// panics if `NetCompMsg<M>` is already registered.
-    fn register_net_comp_custom<T, M, C, R, D>(&mut self, table: &mut MsgTable, transport: Transport) -> &mut Self
+    fn register_net_comp_custom<T, M>(&mut self, table: &mut MsgTable, transport: Transport) -> &mut Self
         where
             T: Into<M> + Component + Clone,
             M: Any + Send + Sync + Into<T> + Serialize + DeserializeOwned + Clone,
-            C: Any + Send + Sync,
-            R: Any + Send + Sync,
-            D: Any + Send + Sync,
     {
         // TODO: make a version that doesnt panic.
         table.register::<NetCompMsg<M>>(transport).unwrap();
-        self.add_system(network_comp_sys_custom::<T, M, C, R, D>)
+        self.add_system(network_comp_sys_custom::<T, M>)
     }
 }
 
 // Syncing Systems
-fn network_comp_sys<T, C, R, D> (
-    server: Option<ResMut<Server<C, R, D>>>,
-    client: Option<ResMut<Client<C, R, D>>>,
+fn network_comp_sys<T> (
+    server: Option<ResMut<Server>>,
+    client: Option<ResMut<Client>>,
     mut q: Query<(&NetEntity, &NetComp<T>, &mut T)>,
     // Add option for sending changed only.
 )
 where
     T: Any + Send + Sync + Serialize + DeserializeOwned + Component + Clone,
-    C: Any + Send + Sync,
-    R: Any + Send + Sync,
-    D: Any + Send + Sync,
 {
-    if let Some(mut server) = server {
+    if let Some(server) = server {
         let msgs: Vec<(CId, &NetCompMsg<T>)> = server.recv::<NetCompMsg<T>>().unwrap().collect();
         for (net_e, net_c, mut comp) in q.iter_mut() {
             match net_c.dir {
@@ -154,7 +139,7 @@ where
                 }
             }
         }
-    } else if let Some(mut client) = client {
+    } else if let Some(client) = client {
         let msgs: Vec<&NetCompMsg<T>> = client.recv::<NetCompMsg<T>>().unwrap().collect();
         for (net_e, net_c, mut comp) in q.iter_mut() {
             match net_c.dir {
@@ -176,20 +161,17 @@ where
     }
 }
 
-fn network_comp_sys_custom<T, M, C, R, D> (
-    server: Option<ResMut<Server<C, R, D>>>,
-    client: Option<ResMut<Client<C, R, D>>>,
+fn network_comp_sys_custom<T, M> (
+    server: Option<ResMut<Server>>,
+    client: Option<ResMut<Client>>,
     mut q: Query<(&NetEntity, &NetComp<T, M>, &mut T)>,
     // Add option for sending changed only.
 )
 where
     T: Into<M> + Component + Clone,
     M: Any + Send + Sync + Into<T> + Serialize + DeserializeOwned + Clone,
-    C: Any + Send + Sync,
-    R: Any + Send + Sync,
-    D: Any + Send + Sync,
 {
-    if let Some(mut server) = server {
+    if let Some(server) = server {
         let msgs: Vec<(CId, &NetCompMsg<M>)> = server.recv::<NetCompMsg<M>>().unwrap().collect();
         for (net_e, net_c, mut comp) in q.iter_mut() {
             match net_c.dir {
@@ -208,7 +190,7 @@ where
                 }
             }
         }
-    } else if let Some(mut client) = client {
+    } else if let Some(client) = client {
         let msgs: Vec<&NetCompMsg<M>> = client.recv::<NetCompMsg<M>>().unwrap().collect();
         for (net_e, net_c, mut comp) in q.iter_mut() {
             match net_c.dir {

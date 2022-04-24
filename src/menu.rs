@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::prelude::PositionType::Absolute;
-use crate::{Client, GameState, MultiplayerType, Server};
+use carrier_pigeon::{Client, Server};
+use crate::{GameState, MultiplayerType};
 
 pub struct MenuPlugin;
 
