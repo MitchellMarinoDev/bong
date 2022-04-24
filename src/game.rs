@@ -556,4 +556,6 @@ fn clean_up(
     for e in q_game_items.iter() {
         commands.entity(e).despawn_recursive();
     }
+    commands.remove_resource::<Client>();
+    commands.remove_resource::<Server>();
 }
