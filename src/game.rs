@@ -342,20 +342,20 @@ fn move_paddle(
     let mut translation = paddle.0.translation;
     let mut rotation = paddle.0.rotation;
 
-    if input.pressed(KeyCode::W) {
+    if input.pressed(KeyCode::W) || input.pressed(KeyCode::Up) {
         translation += Vec3::new(0.0, 14.0, 0.0) * time.delta_seconds() * 60.0;
     }
 
-    if input.pressed(KeyCode::S) {
+    if input.pressed(KeyCode::S) || input.pressed(KeyCode::Down)  {
         translation -= Vec3::new(0.0, 14.0, 0.0) * time.delta_seconds() * 60.0;
     }
 
     let (x, y, mut z) = rotation.to_euler(EulerRot::XYZ);
 
-    if input.pressed(KeyCode::Q) {
+    if input.pressed(KeyCode::Q) || input.pressed(KeyCode::Left)  {
         z += PI/72.0 * time.delta_seconds() * 60.0;
     }
-    if input.pressed(KeyCode::E) {
+    if input.pressed(KeyCode::E) || input.pressed(KeyCode::Right) {
         z -= PI/72.0 * time.delta_seconds() * 60.0;
     }
 
