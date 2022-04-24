@@ -416,7 +416,13 @@ fn clamp_ball_speed(
     mut q_ball: Query<&mut Velocity, With<Ball>>,
 ) {
     if let Some(mut ball) = q_ball.iter_mut().next() {
-        ball.linear.x = ball.linear.x.clamp(200.0, 100000.0);
+        if ball.linear.x.abs() < 200.0 {
+            if ball.linear.x < 0.0 {
+                ball.linear.x = -200.0
+            } else {
+                ball.linear.x = 200.0
+            }
+        }
         if ball.linear.length() < 400.0 {
             ball.linear = ball.linear.normalize() * 400.0;
         }
