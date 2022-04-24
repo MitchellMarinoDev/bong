@@ -3,7 +3,8 @@ use bevy::prelude::*;
 use bevy::prelude::PositionType::Absolute;
 use carrier_pigeon::{CId, Client, MsgTableParts, OptionPendingClient, Server};
 use carrier_pigeon::net::CIdSpec;
-use crate::{Connection, GameState, MultiplayerType, Response};
+use crate::{Connection, GameIp, GameState, MultiplayerType, Name, Response};
+use crate::game::Team;
 use crate::messages::{ConnectionBroadcast, DisconnectBroadcast, RejectReason, StartGame};
 
 pub struct LobbyPlugin;
@@ -34,9 +35,10 @@ enum LobbyButton {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
-struct Players {
-    p1: Option<(CId, String)>,
-    p2: Option<(CId, String)>,
+pub struct Players {
+    pub p1: Option<(CId, String)>,
+    pub p2: Option<(CId, String)>,
+    pub me: Option<Team>,
 }
 
 impl Players {
@@ -119,6 +121,8 @@ impl Plugin for LobbyPlugin {
 }
 
 fn setup_networking(
+    ip: Res<GameIp>,
+    name: Res<Name>,
     mut commands: Commands,
     multiplayer_type: Res<MultiplayerType>,
     parts: Res<MsgTableParts>,
@@ -126,16 +130,16 @@ fn setup_networking(
     match *multiplayer_type {
         MultiplayerType::Server => {
             println!("server");
-            commands.insert_resource(Server::new("127.0.0.1:5599".parse().unwrap(), parts.clone()).unwrap());
+            commands.insert_resource(Server::new(ip.0, parts.clone()).unwrap());
         }
         MultiplayerType::Host => {
             println!("host");
-            commands.insert_resource(Server::new("127.0.0.1:5599".parse().unwrap(), parts.clone()).unwrap());
-            commands.insert_resource(Client::new("127.0.0.1:5599".parse().unwrap(), parts.clone(), Connection::new("Host")).option());
+            commands.insert_resource(Server::new(ip.0, parts.clone()).unwrap());
+            commands.insert_resource(Client::new(ip.0, parts.clone(), Connection::new(name.0.clone())).option());
         }
         MultiplayerType::Client => {
             println!("client");
-            commands.insert_resource(Client::new("127.0.0.1:5599".parse().unwrap(), parts.clone(), Connection::new("Client")).option());
+            commands.insert_resource(Client::new(ip.0, parts.clone(), Connection::new(name.0.clone())).option());
         }
     }
 }
@@ -152,6 +156,9 @@ fn connect_client(
                 if let Response::Accepted(_this_cid, optional_player) = resp {
                     if let Some((p_cid, p)) = optional_player {
                         players.add(p_cid, p);
+                        players.me = Some(Team::Right);
+                    } else {
+                        players.me = Some(Team::Left);
                     }
                 }
                 commands.insert_resource(client);

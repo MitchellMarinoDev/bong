@@ -9,7 +9,7 @@ use crate::plugin::net::NetDirection::*;
 /// which is sent as `M`.
 #[derive(Component)]
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub struct NetComp<T, M>
+pub struct NetComp<T, M = T>
 where
     T: Clone + Into<M> + Component,
     M: Clone + Into<T> + Any + Send + Sync,

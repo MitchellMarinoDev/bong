@@ -1,11 +1,14 @@
+use std::f32::consts::PI;
 use bevy::ecs::query::QueryEntityError;
 use bevy::prelude::*;
 use carrier_pigeon::net::CIdSpec;
 use carrier_pigeon::{Client, Server};
+use carrier_pigeon::net::CIdSpec::{Except, Only};
 use CIdSpec::All;
 use heron::*;
 use NetDirection::*;
 use crate::{GameState, MyTransform, MyVelocity};
+use crate::lobby::Players;
 use crate::messages::BrickBreak;
 use crate::plugin::{NetComp, NetDirection, NetEntity};
 
@@ -23,6 +26,7 @@ impl Plugin for GamePlugin {
             .add_system_set(
                 SystemSet::on_update(GameState::Game)
                     .with_system(break_bricks)
+                    .with_system(move_paddle)
             )
             .add_system_set(
                 SystemSet::on_exit(GameState::Game)
@@ -230,10 +234,35 @@ fn setup_bricks(
 }
 
 fn setup_paddles(
+    server: Option<Res<Server>>,
+    players: Res<Players>,
     mut commands: Commands,
 ) {
     let width = 30.0;
     let height = 200.0;
+
+    let p1 = players.p1.as_ref().unwrap().0;
+    let p2 = players.p2.as_ref().unwrap().0;
+
+    let left_dir;
+    let right_dir;
+
+    if server.is_some() {
+        // Server
+        left_dir = NetDirection::ToFrom(Except(p1), Only(p1));
+        right_dir = NetDirection::ToFrom(Except(p2), Only(p2));
+    } else {
+        match players.me.unwrap() {
+            Team::Left => {
+                left_dir = NetDirection::to();
+                right_dir = NetDirection::from();
+            },
+            Team::Right => {
+                left_dir = NetDirection::from();
+                right_dir = NetDirection::to();
+            },
+        }
+    }
 
     // Left
     commands.spawn()
@@ -243,14 +272,17 @@ fn setup_paddles(
                 color: Color::RED,
                 ..Default::default()
             },
-            transform: Transform::from_xyz(-400.0, 0.0, 0.0),
+            transform: Transform::from_xyz(-350.0, 0.0, 0.0),
             ..Default::default()
         })
         .insert(CollisionShape::Cuboid { half_extends: Vec3::new(width/2.0, height/2.0, 0.0), border_radius: None })
         .insert(PhysicMaterial { restitution: 1.0, ..Default::default() })
-        .insert(RigidBody::Dynamic)
+        .insert(RigidBody::KinematicPositionBased)
+        .insert(RotationConstraints::restrict_to_z_only())
         .insert(GameItem)
         .insert(Paddle(Team::Left))
+        .insert(NetEntity::new(6413180502345645314))
+        .insert(NetComp::<Transform, MyTransform>::new(left_dir))
         .insert(Name::new("Paddle L"));
 
     // Right
@@ -261,15 +293,55 @@ fn setup_paddles(
                 color: Color::BLUE,
                 ..Default::default()
             },
-            transform: Transform::from_xyz(400.0, 0.0, 0.0),
+            transform: Transform::from_xyz(350.0, 0.0, 0.0),
             ..Default::default()
         })
         .insert(CollisionShape::Cuboid { half_extends: Vec3::new(width/2.0, height/2.0, 0.0), border_radius: None })
         .insert(PhysicMaterial { restitution: 1.0, ..Default::default() })
-        .insert(RigidBody::Dynamic)
+        .insert(RigidBody::KinematicPositionBased)
+        .insert(RotationConstraints::restrict_to_z_only())
         .insert(GameItem)
         .insert(Paddle(Team::Right))
+        .insert(NetEntity::new(6413180502345645315))
+        .insert(NetComp::<Transform, MyTransform>::new(right_dir))
         .insert(Name::new("Paddle R"));
+}
+
+fn move_paddle(
+    input: Res<Input<KeyCode>>,
+    players: Res<Players>,
+    mut q_paddle: Query<(&mut Transform, &Paddle)>,
+) {
+    // Only run if we are a player.
+    if players.me.is_none() { return; }
+    let me = players.me.unwrap();
+
+    let mut paddle: (Mut<Transform>, &Paddle) = q_paddle.iter_mut().filter(|(_t, p)| p.0 == me).next().unwrap();
+    let mut translation = paddle.0.translation;
+    let mut rotation = paddle.0.rotation;
+
+    if input.pressed(KeyCode::W) {
+        translation += Vec3::new(0.0, 10.0, 0.0);
+    }
+
+    if input.pressed(KeyCode::S) {
+        translation -= Vec3::new(0.0, 10.0, 0.0);
+    }
+
+    let (x, y, mut z) = rotation.to_euler(EulerRot::XYZ);
+
+    if input.pressed(KeyCode::Q) {
+        z += PI/120.0;
+    }
+    if input.pressed(KeyCode::E) {
+        z -= PI/120.0;
+    }
+
+    z = z.clamp(-PI/3.0, PI/3.0);
+    rotation = Quat::from_euler(EulerRot::XYZ, x, y ,z);
+
+    paddle.0.rotation = rotation;
+    paddle.0.translation = translation;
 }
 
 fn break_bricks(

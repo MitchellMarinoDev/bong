@@ -5,7 +5,7 @@ use carrier_pigeon::{CId, MsgTable, Transport};
 use heron::Velocity;
 use serde::{Deserialize, Serialize};
 
-use crate::{default, Vec2};
+use crate::{default, Quat, Vec2};
 
 /// The connection message.
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
@@ -84,6 +84,7 @@ pub struct BrickBreak(pub u32);
 #[derive(Serialize, Deserialize, Copy, Clone, PartialEq, Debug)]
 pub struct MyTransform {
     pub translation: Vec2,
+    pub rotation: Quat,
     // Rotation or scale are not used.
 }
 
@@ -91,6 +92,7 @@ impl From<Transform> for MyTransform {
     fn from(o: Transform) -> Self {
         MyTransform {
             translation: o.translation.xy(),
+            rotation: o.rotation,
         }
     }
 }
@@ -99,6 +101,7 @@ impl From<MyTransform> for Transform {
     fn from(o: MyTransform) -> Self {
         Transform {
             translation: o.translation.extend(0.0),
+            rotation: o.rotation,
             ..default()
         }
     }

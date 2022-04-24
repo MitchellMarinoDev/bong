@@ -4,6 +4,7 @@ mod game;
 mod menu;
 mod lobby;
 
+use std::net::SocketAddr;
 use bevy::prelude::*;
 use crate::messages::{Connection, Disconnect, MyTransform, MyVelocity, Response};
 use crate::plugin::{AppExt, ClientPlugin, ServerPlugin};
@@ -54,7 +55,20 @@ pub enum GameState {
     GameOver,
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+pub struct GameIp(SocketAddr);
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+pub struct Name(String);
+
+
 fn main() {
+    // Parse the second arg as an ip address.
+    let ip = std::env::args().nth(1).unwrap_or("127.0.0.1:5599".into());
+    let ip: SocketAddr = ip.parse().unwrap_or("127.0.0.1:5599".parse().unwrap());
+
+    let name = std::env::args().nth(2).unwrap_or("Player".into());
+
     let mut table = messages::get_table();
 
     let mut app = App::new();
@@ -66,6 +80,8 @@ fn main() {
     let parts = table.build::<Connection, Response, Disconnect>().unwrap();
 
     app
+        .insert_resource(GameIp(ip))
+        .insert_resource(Name(name))
         .insert_resource(parts)
 
         .insert_resource(WindowDescriptor {
@@ -75,7 +91,7 @@ fn main() {
         })
         .add_state(GameState::Menu)
         .add_plugins(DefaultPlugins)
-        .add_plugin(EditorPlugin)
+        // .add_plugin(EditorPlugin)
         .add_plugin(PhysicsPlugin::default())
         .add_plugin(ClientPlugin)
         .add_plugin(ServerPlugin)

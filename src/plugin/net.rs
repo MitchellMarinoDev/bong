@@ -25,6 +25,18 @@ pub enum NetDirection {
     ToFrom(CIdSpec, CIdSpec),
 }
 
+impl NetDirection {
+    /// Shorthand for [`NetDirection::To(CIdSpec::All)`].
+    pub fn to() -> Self {
+        NetDirection::To(CIdSpec::All)
+    }
+
+    /// Shorthand for [`NetDirection::From(CIdSpec::All)`].
+    pub fn from() -> Self {
+        NetDirection::From(CIdSpec::All)
+    }
+}
+
 /// A networked entity.
 ///
 /// Any entity using [`NetComp`] needs to have one of these
