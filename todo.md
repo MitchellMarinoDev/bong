@@ -1,3 +1,6 @@
 # TODO:
 - [ ] Game end.
-- [ ] Disconnect
+- [ ] Disconnect.
+- [ ] Delete NetEntity option.
+- [ ] Refactor plugin.
+- [ ] Extract plugin.

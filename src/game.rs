@@ -115,7 +115,6 @@ fn setup_game(
     let dir = if server.is_some() { To(All) } else { From(All) };
     let velocity_comp = NetComp::<Velocity, MyVelocity>::new(dir);
     let transform_comp = NetComp::<Transform, MyTransform>::new(dir);
-    println!("Dir: {:?}", dir);
 
     commands.spawn()
         .insert_bundle(SpriteBundle {
