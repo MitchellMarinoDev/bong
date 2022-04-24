@@ -1,7 +1,11 @@
 //! Contains the messages.
+use bevy::math::Vec3Swizzles;
+use bevy::prelude::Transform;
 use carrier_pigeon::{CId, MsgTable, Transport};
-use serde::{Serialize, Deserialize};
-use crate::MsgTableParts;
+use heron::Velocity;
+use serde::{Deserialize, Serialize};
+
+use crate::{default, Vec2};
 
 /// The connection message.
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
@@ -69,3 +73,55 @@ pub fn get_table() -> MsgTable {
 /// A message that indicates that the game has been started by the server.
 #[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
 pub struct StartGame;
+
+/// A reduced [`Transform`] component that can be networked.
+///
+/// Only holds fields relevant to this game.
+#[derive(Serialize, Deserialize, Copy, Clone, PartialEq, Debug)]
+pub struct MyTransform {
+    pub translation: Vec2,
+    // Rotation or scale are not used.
+}
+
+impl From<Transform> for MyTransform {
+    fn from(o: Transform) -> Self {
+        MyTransform {
+            translation: o.translation.xy(),
+        }
+    }
+}
+
+impl From<MyTransform> for Transform {
+    fn from(o: MyTransform) -> Self {
+        Transform {
+            translation: o.translation.extend(0.0),
+            ..default()
+        }
+    }
+}
+
+/// A reduced [`Velocity`] component that can be networked.
+///
+/// Only holds fields relevant to this game.
+#[derive(Serialize, Deserialize, Copy, Clone, PartialEq, Debug)]
+pub struct MyVelocity {
+    pub linear: Vec2,
+    // angular velocity is not used.
+}
+
+impl From<Velocity> for MyVelocity {
+    fn from(o: Velocity) -> Self {
+        MyVelocity {
+            linear: o.linear.xy(),
+        }
+    }
+}
+
+impl From<MyVelocity> for Velocity {
+    fn from(o: MyVelocity) -> Self {
+        Velocity {
+            linear: o.linear.extend(0.0),
+            ..default()
+        }
+    }
+}

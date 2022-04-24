@@ -5,10 +5,11 @@ mod menu;
 mod lobby;
 
 use bevy::prelude::*;
-use crate::messages::{Connection, Disconnect, Response};
+use crate::messages::{Connection, Disconnect, MyTransform, MyVelocity, Response};
 use crate::plugin::{AppExt, ClientPlugin, ServerPlugin};
 use bevy::render::camera::ScalingMode;
 use bevy_editor_pls::EditorPlugin;
+use carrier_pigeon::Transport;
 use heron::prelude::*;
 use crate::game::GamePlugin;
 use crate::lobby::LobbyPlugin;
@@ -63,8 +64,8 @@ fn main() {
 
     let mut app = App::new();
     app
-        .register_net_comp::<Transform>(&mut table)
-        .register_net_comp::<Velocity>(&mut table)
+        .register_net_comp_custom::<Transform, MyTransform, Connection, Response, Disconnect>(&mut table, Transport::UDP)
+        .register_net_comp_custom::<Velocity, MyVelocity, Connection, Response, Disconnect>(&mut table, Transport::UDP)
     ;
 
     let parts = table.build::<Connection, Response, Disconnect>().unwrap();

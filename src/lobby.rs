@@ -2,6 +2,7 @@ use std::f32::consts::PI;
 use bevy::prelude::*;
 use bevy::prelude::PositionType::Absolute;
 use carrier_pigeon::CId;
+use carrier_pigeon::net::CIdSpec;
 use crate::{Client, Connection, GameState, MsgTableParts, MultiplayerType, OptionPendingClient, Response, Server};
 use crate::messages::{ConnectionBroadcast, DisconnectBroadcast, RejectReason, StartGame};
 
@@ -359,7 +360,7 @@ fn handle_ui(
                     if let Some(server) = &mut server {
                         if players.count() == 2 {
                             let _ = game_state.set(GameState::Game);
-                            server.broadcast(&StartGame).unwrap();
+                            server.send_spec(&StartGame, CIdSpec::All).unwrap();
                         }
                     }
                 },
