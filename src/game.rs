@@ -1,4 +1,5 @@
 use std::f32::consts::PI;
+use std::time::{Duration, Instant};
 use bevy::ecs::query::QueryEntityError;
 use bevy::prelude::*;
 use carrier_pigeon::net::CIdSpec;
@@ -30,6 +31,7 @@ impl Plugin for GamePlugin {
                     .with_system(move_paddle)
                     .with_system(clamp_ball_speed)
                     .with_system(game_win)
+                    .with_system(leave_game_after_win)
             )
             .add_system_set(
                 SystemSet::on_exit(GameState::Game)
@@ -63,6 +65,10 @@ pub struct Target(Team);
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 /// All game items have this so that they can be cleaned up easily.
 pub struct GameItem;
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+/// All game items have this so that they can be cleaned up easily.
+pub struct GameWinR(pub Instant);
 
 
 #[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug, Hash)]
@@ -409,6 +415,7 @@ fn clamp_ball_speed(
     mut q_ball: Query<&mut Velocity, With<Ball>>,
 ) {
     if let Some(mut ball) = q_ball.iter_mut().next() {
+        ball.linear.x = ball.linear.x.clamp(200.0, 100000.0);
         if ball.linear.length() < 400.0 {
             ball.linear = ball.linear.normalize() * 400.0;
         }
@@ -432,6 +439,8 @@ fn game_win(
             let collisions: &Collisions = collisions;
             for e in collisions.entities() {
                 if q_ball.get(e).is_ok() {
+                    commands.insert_resource(GameWinR(Instant::now()));
+
                     let font = assets.load("FiraMono-Medium.ttf");
 
                     let win_side = target.0.other();
@@ -443,7 +452,16 @@ fn game_win(
                     commands.entity(e).despawn();
                     commands.spawn_bundle(TextBundle {
                         node: Default::default(),
-                        style: Default::default(),
+                        style: Style {
+                            position_type: PositionType::Absolute,
+                            margin: Rect::all(Val::Auto),
+                            padding: Rect::all(Val::Px(10.0)),
+                            flex_direction: FlexDirection::ColumnReverse,
+                            align_items: AlignItems::Center,
+                            align_self: AlignSelf::Center,
+                            size: Size { width: Val::Percent(100.0), height: Val::Auto },
+                            ..default()
+                        },
                         text: Text::with_section(
                             format!("{winner} wins!"),
                             TextStyle {
@@ -454,12 +472,14 @@ fn game_win(
                             TextAlignment::default(),
                         ),
                         ..default()
-                    });
+                    }).insert(GameItem);
                 }
             }
         }
     } else if let Some(client) = client {
         for gw in client.recv::<GameWin>().unwrap() {
+            commands.insert_resource(GameWinR(Instant::now()));
+
             let font = assets.load("FiraMono-Medium.ttf");
 
             let win_side = gw.0;
@@ -474,7 +494,13 @@ fn game_win(
             commands.spawn_bundle(TextBundle {
                 node: Default::default(),
                 style: Style {
+                    position_type: PositionType::Absolute,
                     margin: Rect::all(Val::Auto),
+                    padding: Rect::all(Val::Px(10.0)),
+                    flex_direction: FlexDirection::ColumnReverse,
+                    align_items: AlignItems::Center,
+                    align_self: AlignSelf::Center,
+                    size: Size { width: Val::Percent(100.0), height: Val::Auto },
                     ..default()
                 },
                 text: Text::with_section(
@@ -487,7 +513,18 @@ fn game_win(
                     TextAlignment::default(),
                 ),
                 ..default()
-            });
+            }).insert(GameItem);
+        }
+    }
+}
+
+fn leave_game_after_win(
+    game_win: Option<Res<GameWinR>>,
+    mut game_state: ResMut<State<GameState>>,
+) {
+    if let Some(gw) = game_win {
+        if gw.0.elapsed() > Duration::from_millis(3000) {
+            game_state.set(GameState::Menu);
         }
     }
 }
