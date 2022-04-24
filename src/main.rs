@@ -58,7 +58,7 @@ pub enum GameState {
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub struct GameIp(SocketAddr);
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Clone, Eq, PartialEq, Debug, Hash)]
 pub struct Name(String);
 
 
