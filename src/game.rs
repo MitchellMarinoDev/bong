@@ -4,7 +4,7 @@ use carrier_pigeon::net::CIdSpec;
 use CIdSpec::All;
 use heron::*;
 use NetDirection::*;
-use crate::{Client, GameState, MultiplayerType, MyTransform, MyVelocity, Server};
+use crate::{Client, GameState, MyTransform, MyVelocity, Server};
 use crate::messages::BrickBreak;
 use crate::plugin::{NetComp, NetDirection, NetEntity};
 
@@ -17,6 +17,7 @@ impl Plugin for GamePlugin {
                 SystemSet::on_enter(GameState::Game)
                     .with_system(setup_game)
                     .with_system(setup_bricks)
+                    .with_system(setup_paddles)
             )
             .add_system_set(
                 SystemSet::on_update(GameState::Game)
@@ -34,6 +35,11 @@ impl Plugin for GamePlugin {
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 /// A brick that is destroyed when the ball hits it.
 pub struct Brick(pub u32);
+
+#[derive(Component)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+/// A brick that is destroyed when the ball hits it.
+pub struct Paddle(Team);
 
 #[derive(Component)]
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
@@ -215,6 +221,55 @@ fn setup_bricks(
             id += 1;
         }
     }
+
+    commands.spawn()
+        .insert(Name::new("Bricks"))
+        .insert(GlobalTransform::identity())
+        .insert(Transform::identity())
+        .push_children(&bricks[..]);
+}
+
+fn setup_paddles(
+    mut commands: Commands,
+) {
+    let width = 30.0;
+    let height = 200.0;
+
+    // Left
+    commands.spawn()
+        .insert_bundle(SpriteBundle {
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(width, height)),
+                color: Color::RED,
+                ..Default::default()
+            },
+            transform: Transform::from_xyz(-400.0, 0.0, 0.0),
+            ..Default::default()
+        })
+        .insert(CollisionShape::Cuboid { half_extends: Vec3::new(width/2.0, height/2.0, 0.0), border_radius: None })
+        .insert(PhysicMaterial { restitution: 1.0, ..Default::default() })
+        .insert(RigidBody::Dynamic)
+        .insert(GameItem)
+        .insert(Paddle(Team::Left))
+        .insert(Name::new("Paddle L"));
+
+    // Right
+    commands.spawn()
+        .insert_bundle(SpriteBundle {
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(width, height)),
+                color: Color::BLUE,
+                ..Default::default()
+            },
+            transform: Transform::from_xyz(400.0, 0.0, 0.0),
+            ..Default::default()
+        })
+        .insert(CollisionShape::Cuboid { half_extends: Vec3::new(width/2.0, height/2.0, 0.0), border_radius: None })
+        .insert(PhysicMaterial { restitution: 1.0, ..Default::default() })
+        .insert(RigidBody::Dynamic)
+        .insert(GameItem)
+        .insert(Paddle(Team::Right))
+        .insert(Name::new("Paddle R"));
 }
 
 fn break_bricks(

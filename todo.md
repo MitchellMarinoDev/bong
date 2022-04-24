@@ -1,0 +1,3 @@
+# TODO:
+- [ ] Game end.
+- [ ] Disconnect
