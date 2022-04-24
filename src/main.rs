@@ -9,7 +9,6 @@ use bevy::prelude::*;
 use crate::messages::{Connection, Disconnect, MyTransform, MyVelocity, Response};
 use crate::plugin::{AppExt, ClientPlugin, ServerPlugin};
 use bevy::render::camera::ScalingMode;
-use bevy_editor_pls::EditorPlugin;
 use carrier_pigeon::Transport;
 use heron::prelude::*;
 use crate::game::GamePlugin;

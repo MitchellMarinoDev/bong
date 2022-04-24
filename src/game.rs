@@ -9,8 +9,9 @@ use heron::*;
 use NetDirection::*;
 use crate::{GameState, MyTransform, MyVelocity};
 use crate::lobby::Players;
-use crate::messages::BrickBreak;
+use crate::messages::{BrickBreak, GameWin};
 use crate::plugin::{NetComp, NetDirection, NetEntity};
+use serde::{Serialize, Deserialize};
 
 pub struct GamePlugin;
 
@@ -27,6 +28,8 @@ impl Plugin for GamePlugin {
                 SystemSet::on_update(GameState::Game)
                     .with_system(break_bricks)
                     .with_system(move_paddle)
+                    .with_system(clamp_ball_speed)
+                    .with_system(game_win)
             )
             .add_system_set(
                 SystemSet::on_exit(GameState::Game)
@@ -62,10 +65,19 @@ pub struct Target(Team);
 pub struct GameItem;
 
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub enum Team {
     Left,
     Right,
+}
+
+impl Team {
+    fn other(&self) -> Self {
+        match self {
+            Team::Left => Team::Right,
+            Team::Right => Team::Left,
+        }
+    }
 }
 
 fn setup_game(
@@ -163,6 +175,7 @@ fn setup_game(
         .insert(RigidBody::Sensor)
         .insert(PhysicMaterial { restitution: 1.0, ..Default::default() })
         .insert(RotationConstraints::lock())
+        .insert(Collisions::default())
         .insert(GameItem)
         .insert(Target(Team::Left))
         .insert(Name::new("Left Target"))
@@ -183,6 +196,7 @@ fn setup_game(
         .insert(RigidBody::Sensor)
         .insert(PhysicMaterial { restitution: 1.0, ..Default::default() })
         .insert(RotationConstraints::lock())
+        .insert(Collisions::default())
         .insert(GameItem)
         .insert(Target(Team::Right))
         .insert(Name::new("Left Right"))
@@ -308,6 +322,7 @@ fn setup_paddles(
 }
 
 fn move_paddle(
+    time: Res<Time>,
     input: Res<Input<KeyCode>>,
     players: Res<Players>,
     mut q_paddle: Query<(&mut Transform, &Paddle)>,
@@ -321,25 +336,29 @@ fn move_paddle(
     let mut rotation = paddle.0.rotation;
 
     if input.pressed(KeyCode::W) {
-        translation += Vec3::new(0.0, 10.0, 0.0);
+        translation += Vec3::new(0.0, 14.0, 0.0) * time.delta_seconds() * 60.0;
     }
 
     if input.pressed(KeyCode::S) {
-        translation -= Vec3::new(0.0, 10.0, 0.0);
+        translation -= Vec3::new(0.0, 14.0, 0.0) * time.delta_seconds() * 60.0;
     }
 
     let (x, y, mut z) = rotation.to_euler(EulerRot::XYZ);
 
     if input.pressed(KeyCode::Q) {
-        z += PI/120.0;
+        z += PI/72.0 * time.delta_seconds() * 60.0;
     }
     if input.pressed(KeyCode::E) {
-        z -= PI/120.0;
+        z -= PI/72.0 * time.delta_seconds() * 60.0;
     }
 
-    z = z.clamp(-PI/3.0, PI/3.0);
+    // Clamp
+    z = z.clamp(-PI/8.0, PI/8.0);
     rotation = Quat::from_euler(EulerRot::XYZ, x, y ,z);
 
+    translation.y = translation.y.clamp(-500.0, 500.0);
+
+    // Apply
     paddle.0.rotation = rotation;
     paddle.0.translation = translation;
 }
@@ -354,24 +373,25 @@ fn break_bricks(
 ) {
     if let Some(server) = server {
         // Break balls based on collision
-        let ball = q_ball.single();
-        for event in collisions.iter() {
-            if let CollisionEvent::Stopped(d1, d2) = event {
-                let e1 = d1.rigid_body_entity();
-                let e2 = d2.rigid_body_entity();
+        if let Some(ball) = q_ball.iter().next() {
+            for event in collisions.iter() {
+                if let CollisionEvent::Stopped(d1, d2) = event {
+                    let e1 = d1.rigid_body_entity();
+                    let e2 = d2.rigid_body_entity();
 
-                let brick_e2: Result<(Entity, &Brick), QueryEntityError> = q_brick.get(e2);
-                let brick_e1: Result<(Entity, &Brick), QueryEntityError> = q_brick.get(e1);
+                    let brick_e2: Result<(Entity, &Brick), QueryEntityError> = q_brick.get(e2);
+                    let brick_e1: Result<(Entity, &Brick), QueryEntityError> = q_brick.get(e1);
 
-                // e2 is a brick colliding with a ball
-                if e1 == ball && brick_e2.is_ok() {
-                    server.broadcast(&BrickBreak(brick_e2.unwrap().1.0)).unwrap();
-                    commands.entity(e2).despawn();
-                }
-                // e1 is a brick colliding with a ball
-                if e2 == ball && brick_e1.is_ok() {
-                    server.broadcast(&BrickBreak(brick_e1.unwrap().1.0)).unwrap();
-                    commands.entity(e1).despawn();
+                    // e2 is a brick colliding with a ball
+                    if e1 == ball && brick_e2.is_ok() {
+                        server.broadcast(&BrickBreak(brick_e2.unwrap().1.0)).unwrap();
+                        commands.entity(e2).despawn();
+                    }
+                    // e1 is a brick colliding with a ball
+                    if e2 == ball && brick_e1.is_ok() {
+                        server.broadcast(&BrickBreak(brick_e1.unwrap().1.0)).unwrap();
+                        commands.entity(e1).despawn();
+                    }
                 }
             }
         }
@@ -381,6 +401,93 @@ fn break_bricks(
             if ids.contains(&brick.0) {
                 commands.entity(e).despawn();
             }
+        }
+    }
+}
+
+fn clamp_ball_speed(
+    mut q_ball: Query<&mut Velocity, With<Ball>>,
+) {
+    if let Some(mut ball) = q_ball.iter_mut().next() {
+        if ball.linear.length() < 400.0 {
+            ball.linear = ball.linear.normalize() * 400.0;
+        }
+        if ball.linear.length() > 1200.0 {
+            ball.linear = ball.linear.normalize() * 1200.0;
+        }
+    }
+}
+
+fn game_win(
+    players: Res<Players>,
+    server: Option<Res<Server>>,
+    client: Option<Res<Client>>,
+    q_targets: Query<(&Target, &Collisions)>,
+    q_ball: Query<Entity, With<Ball>>,
+    assets: Res<AssetServer>,
+    mut commands: Commands,
+) {
+    if let Some(server) = server {
+        for (target, collisions) in q_targets.iter() {
+            let collisions: &Collisions = collisions;
+            for e in collisions.entities() {
+                if q_ball.get(e).is_ok() {
+                    let font = assets.load("FiraMono-Medium.ttf");
+
+                    let win_side = target.0.other();
+                    let winner = match win_side {
+                        Team::Left => players.p1.as_ref().unwrap().1.clone(),
+                        Team::Right => players.p2.as_ref().unwrap().1.clone(),
+                    };
+                    server.broadcast(&GameWin(win_side)).unwrap();
+                    commands.entity(e).despawn();
+                    commands.spawn_bundle(TextBundle {
+                        node: Default::default(),
+                        style: Default::default(),
+                        text: Text::with_section(
+                            format!("{winner} wins!"),
+                            TextStyle {
+                                font,
+                                font_size: 60.0,
+                                color: Color::BLACK,
+                            },
+                            TextAlignment::default(),
+                        ),
+                        ..default()
+                    });
+                }
+            }
+        }
+    } else if let Some(client) = client {
+        for gw in client.recv::<GameWin>().unwrap() {
+            let font = assets.load("FiraMono-Medium.ttf");
+
+            let win_side = gw.0;
+            let winner = match win_side {
+                Team::Left => players.p1.as_ref().unwrap().1.clone(),
+                Team::Right => players.p2.as_ref().unwrap().1.clone(),
+            };
+
+            let ball = q_ball.iter().next().unwrap();
+            commands.entity(ball).despawn();
+
+            commands.spawn_bundle(TextBundle {
+                node: Default::default(),
+                style: Style {
+                    margin: Rect::all(Val::Auto),
+                    ..default()
+                },
+                text: Text::with_section(
+                    format!("{winner} wins!"),
+                    TextStyle {
+                        font,
+                        font_size: 60.0,
+                        color: Color::BLACK,
+                    },
+                    TextAlignment::default(),
+                ),
+                ..default()
+            });
         }
     }
 }

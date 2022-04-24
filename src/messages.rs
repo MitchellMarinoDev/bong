@@ -6,6 +6,7 @@ use heron::Velocity;
 use serde::{Deserialize, Serialize};
 
 use crate::{default, Quat, Vec2};
+use crate::game::Team;
 
 /// The connection message.
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
@@ -67,6 +68,7 @@ pub fn get_table() -> MsgTable {
     table.register::<DisconnectBroadcast>(Transport::TCP).unwrap();
     table.register::<StartGame>(Transport::TCP).unwrap();
     table.register::<BrickBreak>(Transport::TCP).unwrap();
+    table.register::<GameWin>(Transport::TCP).unwrap();
 
     table
 }
@@ -74,6 +76,10 @@ pub fn get_table() -> MsgTable {
 /// A message that indicates that the game has been started by the server.
 #[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
 pub struct StartGame;
+
+/// A message that indicates that the game has been started by the server.
+#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
+pub struct GameWin(pub Team);
 
 #[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
 pub struct BrickBreak(pub u32);
