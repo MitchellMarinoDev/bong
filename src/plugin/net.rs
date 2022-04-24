@@ -1,7 +1,7 @@
 use std::any::Any;
 
 use bevy::prelude::*;
-use carrier_pigeon::{CId, Client, MsgTable, Server, Transport};
+use carrier_pigeon::{CId, Client, MsgRegError, MsgTable, Server, Transport};
 use carrier_pigeon::net::CIdSpec;
 use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
@@ -49,7 +49,6 @@ impl NetEntity {
 /// This wraps the component message type with the entity's `id`.
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
 pub(crate) struct NetCompMsg<M: Any + Send + Sync> {
-    // TODO: create type alias.
     id: u64,
     msg: M,
 }
@@ -66,110 +65,62 @@ impl<M: Any + Send + Sync> NetCompMsg<M> {
 
 /// An extension trait for easy registering [`NetComp`] types.
 pub trait AppExt {
-    fn register_net_comp<T>(&mut self, table: &mut MsgTable, transport: Transport) -> &mut Self
+    fn sync_comp<T, M>(&mut self, table: &mut MsgTable, transport: Transport) -> &mut Self
         where
-            T: Any + Send + Sync + Serialize + DeserializeOwned + Component + Clone,
+            T: Clone + Into<M> + Component,
+            M: Clone + Into<T> + Any + Send + Sync + Serialize + DeserializeOwned,
     ;
 
-    fn register_net_comp_custom<T, M>(&mut self, table: &mut MsgTable, transport: Transport) -> &mut Self
-    where
-        T: Into<M> + Component + Clone,
-        M: Any + Send + Sync + Into<T> + Serialize + DeserializeOwned + Clone,
+    fn try_sync_comp<T, M>(&mut self, table: &mut MsgTable, transport: Transport) -> Result<&mut Self, MsgRegError>
+        where
+            T: Clone + Into<M> + Component,
+            M: Clone + Into<T> + Any + Send + Sync + Serialize + DeserializeOwned,
     ;
 }
 
 impl AppExt for App {
-    /// Registers the type `NetCompMsg<T>` into `table` and adds the
-    /// system required to sync components of type `T`.
+    /// Adds everything needed to sync component `T` using message type `M`.
     ///
-    /// ### Panics
-    /// panics if `NetCompMsg<T>` is already registered.
-    fn register_net_comp<T>(&mut self, table: &mut MsgTable, transport: Transport) -> &mut Self
-    where
-        T: Any + Send + Sync + Serialize + DeserializeOwned + Component + Clone,
-    {
-        // TODO: make a version that doesnt panic.
-        table.register::<NetCompMsg<T>>(transport).unwrap();
-        self.add_system(network_comp_sys::<T>)
-    }
-
     /// Registers the type `NetCompMsg<M>` into `table` and adds the
-    /// system required to sync components of type `T`,
-    /// using type `M` to send.
+    /// system required to sync components of type `T`, using type `M`
+    /// to send.
+    ///
+    /// Types `T` and `M` ***can*** be the same type; if the component `T`
+    /// implements all the required traits, you may use it as `M`.
     ///
     /// ### Panics
-    /// panics if `NetCompMsg<M>` is already registered.
-    fn register_net_comp_custom<T, M>(&mut self, table: &mut MsgTable, transport: Transport) -> &mut Self
-        where
-            T: Into<M> + Component + Clone,
-            M: Any + Send + Sync + Into<T> + Serialize + DeserializeOwned + Clone,
+    /// panics if `NetCompMsg<M>` is already registered in the table (If you
+    /// call this method twice with the same `M`).
+    fn sync_comp<T, M>(&mut self, table: &mut MsgTable, transport: Transport) -> &mut Self
+    where
+        T: Clone + Into<M> + Component,
+        M: Clone + Into<T> + Any + Send + Sync + Serialize + DeserializeOwned,
     {
-        // TODO: make a version that doesnt panic.
         table.register::<NetCompMsg<M>>(transport).unwrap();
-        self.add_system(network_comp_sys_custom::<T, M>)
+        self.add_system(network_comp_sys::<T, M>)
+    }
+
+    /// Adds everything needed to sync component `T` using message type `M`.
+    ///
+    /// Same as [`sync_comp()`](App::sync_comp), but doesnt panic in the event of a [`MsgRegError`].
+    fn try_sync_comp<T, M>(&mut self, table: &mut MsgTable, transport: Transport) -> Result<&mut Self, MsgRegError>
+        where
+            T: Clone + Into<M> + Component,
+            M: Clone + Into<T> + Any + Send + Sync + Serialize + DeserializeOwned,
+    {
+        table.register::<NetCompMsg<M>>(transport)?;
+        Ok(self.add_system(network_comp_sys::<T, M>))
     }
 }
 
-// Syncing Systems
-fn network_comp_sys<T> (
-    server: Option<ResMut<Server>>,
-    client: Option<ResMut<Client>>,
-    mut q: Query<(&NetEntity, &NetComp<T>, &mut T)>,
-    // Add option for sending changed only.
-)
-where
-    T: Any + Send + Sync + Serialize + DeserializeOwned + Component + Clone,
-{
-    if let Some(server) = server {
-        let msgs: Vec<(CId, &NetCompMsg<T>)> = server.recv::<NetCompMsg<T>>().unwrap().collect();
-        for (net_e, net_c, mut comp) in q.iter_mut() {
-            match net_c.dir {
-                NetDirection::From(spec) => {
-                    // Get the last message that matches with the entity and CIdSpec
-                    if let Some(&(_cid, valid_msg)) = msgs.iter().filter(|(cid, msg)| spec.matches(*cid) && msg.id == net_e.id).last() {
-                        *comp = valid_msg.msg.clone();
-                    }
-                }
-                NetDirection::To(spec) => {
-                    // TODO: handle potential error.
-                    server.send_spec(&NetCompMsg::<T>::new(net_e.id, comp.clone()), spec).unwrap();
-                }
-                NetDirection::ToFrom(to_spec, from_spec) => {
-                    todo!()
-                }
-            }
-        }
-    } else if let Some(client) = client {
-        let msgs: Vec<&NetCompMsg<T>> = client.recv::<NetCompMsg<T>>().unwrap().collect();
-        for (net_e, net_c, mut comp) in q.iter_mut() {
-            match net_c.dir {
-                NetDirection::From(_) => {
-                    // Get the last message that matches with the entity and CIdSpec
-                    if let Some(&valid_msg) = msgs.iter().filter(|msg| msg.id == net_e.id).last() {
-                        *comp = valid_msg.msg.clone();
-                    }
-                }
-                NetDirection::To(_) => {
-                    // TODO: handle potential error.
-                    client.send(&NetCompMsg::<T>::new(net_e.id, comp.clone())).unwrap();
-                }
-                NetDirection::ToFrom(_, _) => {
-                    todo!()
-                }
-            }
-        }
-    }
-}
-
-fn network_comp_sys_custom<T, M> (
+fn network_comp_sys<T, M> (
     server: Option<ResMut<Server>>,
     client: Option<ResMut<Client>>,
     mut q: Query<(&NetEntity, &NetComp<T, M>, &mut T)>,
-    // Add option for sending changed only.
 )
 where
-    T: Into<M> + Component + Clone,
-    M: Any + Send + Sync + Into<T> + Serialize + DeserializeOwned + Clone,
+    T: Clone + Into<M> + Component,
+    M: Clone + Into<T> + Any + Send + Sync,
 {
     if let Some(server) = server {
         let msgs: Vec<(CId, &NetCompMsg<M>)> = server.recv::<NetCompMsg<M>>().unwrap().collect();
@@ -182,11 +133,20 @@ where
                     }
                 }
                 NetDirection::To(spec) => {
-                    // TODO: handle potential error.
-                    server.send_spec(&NetCompMsg::<M>::new(net_e.id, comp.clone().into()), spec).unwrap();
+                    if let Err(e) = server.send_spec(&NetCompMsg::<M>::new(net_e.id, comp.clone().into()), spec) {
+                        error!("{}", e);
+                    }
                 }
                 NetDirection::ToFrom(to_spec, from_spec) => {
-                    todo!()
+                    // TODO: log overlap
+                    // From
+                    if let Some(&(_cid, valid_msg)) = msgs.iter().filter(|(cid, msg)| from_spec.matches(*cid) && msg.id == net_e.id).last() {
+                        *comp = valid_msg.msg.clone().into();
+                    }
+                    // To
+                    if let Err(e) = server.send_spec(&NetCompMsg::<M>::new(net_e.id, comp.clone().into()), to_spec) {
+                        error!("{}", e);
+                    }
                 }
             }
         }
@@ -201,11 +161,12 @@ where
                     }
                 }
                 NetDirection::To(_) => {
-                    // TODO: handle potential error.
-                    client.send(&NetCompMsg::<M>::new(net_e.id, comp.clone().into())).unwrap();
+                    if let Err(e) = client.send(&NetCompMsg::<M>::new(net_e.id, comp.clone().into())) {
+                        error!("{}", e);
+                    }
                 }
                 NetDirection::ToFrom(_, _) => {
-                    todo!()
+                    error!("NetEntity {{ id: {} }} has NetDirection::ToFrom, but this is not allowed on clients.", net_e.id);
                 }
             }
         }

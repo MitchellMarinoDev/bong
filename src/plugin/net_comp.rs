@@ -9,19 +9,20 @@ use crate::plugin::net::NetDirection::*;
 /// which is sent as `M`.
 #[derive(Component)]
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub struct NetComp<T, M = T>
+pub struct NetComp<T, M>
 where
-    T: Any + Send + Send + Into<M> + Component,
-    M: Any + Send + Send,
+    T: Clone + Into<M> + Component,
+    M: Clone + Into<T> + Any + Send + Sync,
 {
+    // TODO: Add option for changed only.
     pub dir: NetDirection,
     _pd: PhantomData<(T, M)>
 }
 
 impl<T, M> Default for NetComp<T, M>
 where
-    T: Any + Send + Send + Into<M> + Component,
-    M: Any + Send + Send,
+    T: Clone + Into<M> + Component,
+    M: Clone + Into<T> + Any + Send + Sync,
 {
     fn default() -> Self {
         NetComp {
@@ -33,8 +34,8 @@ where
 
 impl<T, M> NetComp<T, M>
     where
-        T: Any + Send + Send + Into<M> + Component,
-        M: Any + Send + Send,
+        T: Clone + Into<M> + Component,
+        M: Clone + Into<T> + Any + Send + Sync,
 {
     pub fn new(dir: NetDirection) -> Self {
         NetComp {

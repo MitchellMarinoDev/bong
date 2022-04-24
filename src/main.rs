@@ -59,8 +59,8 @@ fn main() {
 
     let mut app = App::new();
     app
-        .register_net_comp_custom::<Transform, MyTransform>(&mut table, Transport::UDP)
-        .register_net_comp_custom::<Velocity, MyVelocity>(&mut table, Transport::UDP)
+        .sync_comp::<Transform, MyTransform>(&mut table, Transport::UDP)
+        .sync_comp::<Velocity, MyVelocity>(&mut table, Transport::UDP)
     ;
 
     let parts = table.build::<Connection, Response, Disconnect>().unwrap();
