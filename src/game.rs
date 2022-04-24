@@ -1,75 +1,64 @@
-use std::f32::consts::PI;
-use std::time::{Duration, Instant};
-use bevy::ecs::query::QueryEntityError;
-use bevy::prelude::*;
-use carrier_pigeon::net::CIdSpec;
-use carrier_pigeon::{Client, Server};
-use carrier_pigeon::net::CIdSpec::{Except, Only};
-use CIdSpec::All;
-use heron::*;
-use NetDirection::*;
-use crate::{GameState, MyTransform, MyVelocity};
 use crate::lobby::Players;
 use crate::messages::{BrickBreak, GameWin};
 use crate::plugin::{NetComp, NetDirection, NetEntity};
-use serde::{Serialize, Deserialize};
+use crate::{GameState, MyTransform, MyVelocity};
+use bevy::ecs::query::QueryEntityError;
+use bevy::prelude::*;
+use carrier_pigeon::net::CIdSpec;
+use carrier_pigeon::net::CIdSpec::{Except, Only};
+use carrier_pigeon::{Client, Server};
+use heron::*;
+use serde::{Deserialize, Serialize};
+use std::f32::consts::PI;
+use std::time::{Duration, Instant};
+use CIdSpec::All;
+use NetDirection::*;
 
 pub struct GamePlugin;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_system_set(
-                SystemSet::on_enter(GameState::Game)
-                    .with_system(setup_game)
-                    .with_system(setup_bricks)
-                    .with_system(setup_paddles)
-            )
-            .add_system_set(
-                SystemSet::on_update(GameState::Game)
-                    .with_system(break_bricks)
-                    .with_system(move_paddle)
-                    .with_system(clamp_ball_speed)
-                    .with_system(game_win)
-                    .with_system(leave_game_after_win)
-            )
-            .add_system_set(
-                SystemSet::on_exit(GameState::Game)
-                    .with_system(clean_up)
-            )
-        ;
+        app.add_system_set(
+            SystemSet::on_enter(GameState::Game)
+                .with_system(setup_game)
+                .with_system(setup_bricks)
+                .with_system(setup_paddles),
+        )
+        .add_system_set(
+            SystemSet::on_update(GameState::Game)
+                .with_system(break_bricks)
+                .with_system(move_paddle)
+                .with_system(clamp_ball_speed)
+                .with_system(game_win)
+                .with_system(leave_game_after_win),
+        )
+        .add_system_set(SystemSet::on_exit(GameState::Game).with_system(clean_up));
     }
 }
 
-#[derive(Component)]
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Component, Copy, Clone, Eq, PartialEq, Debug, Hash)]
 /// A brick that is destroyed when the ball hits it.
 pub struct Brick(pub u32);
 
-#[derive(Component)]
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Component, Copy, Clone, Eq, PartialEq, Debug, Hash)]
 /// A brick that is destroyed when the ball hits it.
 pub struct Paddle(Team);
 
-#[derive(Component)]
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Component, Copy, Clone, Eq, PartialEq, Debug, Hash)]
 /// The ball.
 pub struct Ball;
 
-#[derive(Component)]
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Component, Copy, Clone, Eq, PartialEq, Debug, Hash)]
 /// The target that the opposing team is trying to hit.
 pub struct Target(Team);
 
-#[derive(Component)]
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Component, Copy, Clone, Eq, PartialEq, Debug, Hash)]
 /// All game items have this so that they can be cleaned up easily.
 pub struct GameItem;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 /// All game items have this so that they can be cleaned up easily.
 pub struct GameWinR(pub Instant);
-
 
 #[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub enum Team {
@@ -86,13 +75,10 @@ impl Team {
     }
 }
 
-fn setup_game(
-    mut commands: Commands,
-    server: Option<Res<Server>>,
-    assets: Res<AssetServer>,
-) {
+fn setup_game(mut commands: Commands, server: Option<Res<Server>>, assets: Res<AssetServer>) {
     // Walls
-    commands.spawn()
+    commands
+        .spawn()
         .insert(Transform::default())
         .insert(GlobalTransform::default())
         .insert(RigidBody::Static)
@@ -100,36 +86,53 @@ fn setup_game(
         .insert(Name::new("Walls"))
         .with_children(|parent| {
             // Bottom
-            parent.spawn()
+            parent
+                .spawn()
                 .insert(Name::new("Wall B"))
-                .insert(Transform::from_xyz(0.0, (-1080.0/2.0)-40.0, 0.0))
+                .insert(Transform::from_xyz(0.0, (-1080.0 / 2.0) - 40.0, 0.0))
                 .insert(GlobalTransform::default())
-                .insert(CollisionShape::Cuboid { half_extends: Vec3::new(2000.0/2.0, 40.0, 0.0), border_radius: None });
+                .insert(CollisionShape::Cuboid {
+                    half_extends: Vec3::new(2000.0 / 2.0, 40.0, 0.0),
+                    border_radius: None,
+                });
 
             // Top
-            parent.spawn()
+            parent
+                .spawn()
                 .insert(Name::new("Wall T"))
-                .insert(Transform::from_xyz(0.0, (1080.0/2.0)+40.0, 0.0))
+                .insert(Transform::from_xyz(0.0, (1080.0 / 2.0) + 40.0, 0.0))
                 .insert(GlobalTransform::default())
-                .insert(CollisionShape::Cuboid { half_extends: Vec3::new(2000.0/2.0, 40.0, 0.0), border_radius: None });
+                .insert(CollisionShape::Cuboid {
+                    half_extends: Vec3::new(2000.0 / 2.0, 40.0, 0.0),
+                    border_radius: None,
+                });
 
             // Left
-            parent.spawn()
+            parent
+                .spawn()
                 .insert(Name::new("Wall L"))
-                .insert(Transform::from_xyz((-1920.0/2.0)-40.0, 0.0, 0.0))
+                .insert(Transform::from_xyz((-1920.0 / 2.0) - 40.0, 0.0, 0.0))
                 .insert(GlobalTransform::default())
-                .insert(CollisionShape::Cuboid { half_extends: Vec3::new(40.0, 1160.0/2.0, 0.0), border_radius: None });
+                .insert(CollisionShape::Cuboid {
+                    half_extends: Vec3::new(40.0, 1160.0 / 2.0, 0.0),
+                    border_radius: None,
+                });
 
             // Right
-            parent.spawn()
+            parent
+                .spawn()
                 .insert(Name::new("Wall R"))
-                .insert(Transform::from_xyz((1920.0/2.0)+40.0, 0.0, 0.0))
+                .insert(Transform::from_xyz((1920.0 / 2.0) + 40.0, 0.0, 0.0))
                 .insert(GlobalTransform::default())
-                .insert(CollisionShape::Cuboid { half_extends: Vec3::new(40.0, 1160.0/2.0, 0.0), border_radius: None });
-
+                .insert(CollisionShape::Cuboid {
+                    half_extends: Vec3::new(40.0, 1160.0 / 2.0, 0.0),
+                    border_radius: None,
+                });
         })
-        .insert(PhysicMaterial { restitution: 1.0, ..Default::default() })
-    ;
+        .insert(PhysicMaterial {
+            restitution: 1.0,
+            ..Default::default()
+        });
 
     let ball_ico = assets.load("ball.png");
 
@@ -138,7 +141,8 @@ fn setup_game(
     let velocity_comp = NetComp::<Velocity, MyVelocity>::new(dir);
     let transform_comp = NetComp::<Transform, MyTransform>::new(dir);
 
-    commands.spawn()
+    commands
+        .spawn()
         .insert_bundle(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgb_u8(255, 50, 50),
@@ -151,22 +155,24 @@ fn setup_game(
         })
         .insert(CollisionShape::Sphere { radius: 10.0 })
         .insert(RigidBody::Dynamic)
-        .insert(PhysicMaterial { restitution: 1.0, ..Default::default() })
+        .insert(PhysicMaterial {
+            restitution: 1.0,
+            ..Default::default()
+        })
         .insert(RotationConstraints::lock())
         .insert(Velocity::from_linear(Vec3::new(750.0, 0.0, 0.0)))
         .insert(GameItem)
         .insert(Ball)
         .insert(Name::new("Ball"))
-
         .insert(velocity_comp)
         .insert(transform_comp)
-        .insert(NetEntity::new(5768696975200910899))
-    ;
+        .insert(NetEntity::new(5768696975200910899));
 
     // Targets
     let crown_ico = assets.load("crown.png");
     let target_size = 125.0;
-    commands.spawn()
+    commands
+        .spawn()
         .insert_bundle(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgb_u8(255, 25, 25),
@@ -177,17 +183,22 @@ fn setup_game(
             transform: Transform::from_xyz(-897.5, 0.0, 0.0),
             ..Default::default()
         })
-        .insert(CollisionShape::Sphere { radius: target_size/2.0 })
+        .insert(CollisionShape::Sphere {
+            radius: target_size / 2.0,
+        })
         .insert(RigidBody::Sensor)
-        .insert(PhysicMaterial { restitution: 1.0, ..Default::default() })
+        .insert(PhysicMaterial {
+            restitution: 1.0,
+            ..Default::default()
+        })
         .insert(RotationConstraints::lock())
         .insert(Collisions::default())
         .insert(GameItem)
         .insert(Target(Team::Left))
-        .insert(Name::new("Left Target"))
-    ;
+        .insert(Name::new("Left Target"));
 
-    commands.spawn()
+    commands
+        .spawn()
         .insert_bundle(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgb_u8(25, 25, 255),
@@ -198,34 +209,50 @@ fn setup_game(
             transform: Transform::from_xyz(897.5, 0.0, 0.0),
             ..Default::default()
         })
-        .insert(CollisionShape::Sphere { radius: target_size/2.0 })
+        .insert(CollisionShape::Sphere {
+            radius: target_size / 2.0,
+        })
         .insert(RigidBody::Sensor)
-        .insert(PhysicMaterial { restitution: 1.0, ..Default::default() })
+        .insert(PhysicMaterial {
+            restitution: 1.0,
+            ..Default::default()
+        })
         .insert(RotationConstraints::lock())
         .insert(Collisions::default())
         .insert(GameItem)
         .insert(Target(Team::Right))
-        .insert(Name::new("Left Right"))
-    ;
+        .insert(Name::new("Left Right"));
 }
 
-fn setup_bricks(
-    mut commands: Commands,
-) {
+fn setup_bricks(mut commands: Commands) {
     let mut id = 0;
     let mut bricks = vec![];
     // Left
     let height = 108.0;
     let width = 60.0;
     let count = 10;
-    let colors = [Color::RED, Color::ORANGE_RED, Color::ORANGE, Color::YELLOW, Color::YELLOW_GREEN, Color::GREEN];
+    let colors = [
+        Color::RED,
+        Color::ORANGE_RED,
+        Color::ORANGE,
+        Color::YELLOW,
+        Color::YELLOW_GREEN,
+        Color::GREEN,
+    ];
 
     for r in 0..colors.len() {
         let color = colors[r];
         let x = -500.0 - width * r as f32;
         for i in 1..=count {
-            let h = i as f32 - (count+1) as f32 / 2.0;
-            bricks.push(spawn_brick(&mut commands, color, [x,  (h * height)].into(), width, height, id));
+            let h = i as f32 - (count + 1) as f32 / 2.0;
+            bricks.push(spawn_brick(
+                &mut commands,
+                color,
+                [x, (h * height)].into(),
+                width,
+                height,
+                id,
+            ));
             id += 1;
         }
     }
@@ -234,19 +261,34 @@ fn setup_bricks(
     let height = 108.0;
     let width = 60.0;
     let count = 10;
-    let colors = [Color::SEA_GREEN, Color::BLUE, Color::MIDNIGHT_BLUE, Color::INDIGO, Color::PURPLE, Color::VIOLET];
+    let colors = [
+        Color::SEA_GREEN,
+        Color::BLUE,
+        Color::MIDNIGHT_BLUE,
+        Color::INDIGO,
+        Color::PURPLE,
+        Color::VIOLET,
+    ];
 
     for r in 0..colors.len() {
         let color = colors[r];
         let x = 500.0 + width * r as f32;
         for i in 1..=count {
-            let h = i as f32 - (count+1) as f32 / 2.0;
-            bricks.push(spawn_brick(&mut commands, color, [x,  (h * height)].into(), width, height, id));
+            let h = i as f32 - (count + 1) as f32 / 2.0;
+            bricks.push(spawn_brick(
+                &mut commands,
+                color,
+                [x, (h * height)].into(),
+                width,
+                height,
+                id,
+            ));
             id += 1;
         }
     }
 
-    commands.spawn()
+    commands
+        .spawn()
         .insert(Name::new("Bricks"))
         .insert(GlobalTransform::identity())
         .insert(Transform::identity())
@@ -254,11 +296,7 @@ fn setup_bricks(
         .push_children(&bricks[..]);
 }
 
-fn setup_paddles(
-    server: Option<Res<Server>>,
-    players: Res<Players>,
-    mut commands: Commands,
-) {
+fn setup_paddles(server: Option<Res<Server>>, players: Res<Players>, mut commands: Commands) {
     let width = 30.0;
     let height = 200.0;
 
@@ -277,16 +315,17 @@ fn setup_paddles(
             Team::Left => {
                 left_dir = NetDirection::to();
                 right_dir = NetDirection::from();
-            },
+            }
             Team::Right => {
                 left_dir = NetDirection::from();
                 right_dir = NetDirection::to();
-            },
+            }
         }
     }
 
     // Left
-    commands.spawn()
+    commands
+        .spawn()
         .insert_bundle(SpriteBundle {
             sprite: Sprite {
                 custom_size: Some(Vec2::new(width, height)),
@@ -296,8 +335,14 @@ fn setup_paddles(
             transform: Transform::from_xyz(-350.0, 0.0, 0.0),
             ..Default::default()
         })
-        .insert(CollisionShape::Cuboid { half_extends: Vec3::new(width/2.0, height/2.0, 0.0), border_radius: None })
-        .insert(PhysicMaterial { restitution: 1.0, ..Default::default() })
+        .insert(CollisionShape::Cuboid {
+            half_extends: Vec3::new(width / 2.0, height / 2.0, 0.0),
+            border_radius: None,
+        })
+        .insert(PhysicMaterial {
+            restitution: 1.0,
+            ..Default::default()
+        })
         .insert(RigidBody::KinematicPositionBased)
         .insert(RotationConstraints::restrict_to_z_only())
         .insert(GameItem)
@@ -307,7 +352,8 @@ fn setup_paddles(
         .insert(Name::new("Paddle L"));
 
     // Right
-    commands.spawn()
+    commands
+        .spawn()
         .insert_bundle(SpriteBundle {
             sprite: Sprite {
                 custom_size: Some(Vec2::new(width, height)),
@@ -317,8 +363,14 @@ fn setup_paddles(
             transform: Transform::from_xyz(350.0, 0.0, 0.0),
             ..Default::default()
         })
-        .insert(CollisionShape::Cuboid { half_extends: Vec3::new(width/2.0, height/2.0, 0.0), border_radius: None })
-        .insert(PhysicMaterial { restitution: 1.0, ..Default::default() })
+        .insert(CollisionShape::Cuboid {
+            half_extends: Vec3::new(width / 2.0, height / 2.0, 0.0),
+            border_radius: None,
+        })
+        .insert(PhysicMaterial {
+            restitution: 1.0,
+            ..Default::default()
+        })
         .insert(RigidBody::KinematicPositionBased)
         .insert(RotationConstraints::restrict_to_z_only())
         .insert(GameItem)
@@ -335,10 +387,16 @@ fn move_paddle(
     mut q_paddle: Query<(&mut Transform, &Paddle)>,
 ) {
     // Only run if we are a player.
-    if players.me.is_none() { return; }
+    if players.me.is_none() {
+        return;
+    }
     let me = players.me.unwrap();
 
-    let mut paddle: (Mut<Transform>, &Paddle) = q_paddle.iter_mut().filter(|(_t, p)| p.0 == me).next().unwrap();
+    let mut paddle: (Mut<Transform>, &Paddle) = q_paddle
+        .iter_mut()
+        .filter(|(_t, p)| p.0 == me)
+        .next()
+        .unwrap();
     let mut translation = paddle.0.translation;
     let mut rotation = paddle.0.rotation;
 
@@ -346,22 +404,22 @@ fn move_paddle(
         translation += Vec3::new(0.0, 14.0, 0.0) * time.delta_seconds() * 60.0;
     }
 
-    if input.pressed(KeyCode::S) || input.pressed(KeyCode::Down)  {
+    if input.pressed(KeyCode::S) || input.pressed(KeyCode::Down) {
         translation -= Vec3::new(0.0, 14.0, 0.0) * time.delta_seconds() * 60.0;
     }
 
     let (x, y, mut z) = rotation.to_euler(EulerRot::XYZ);
 
-    if input.pressed(KeyCode::Q) || input.pressed(KeyCode::Left)  {
-        z += PI/72.0 * time.delta_seconds() * 60.0;
+    if input.pressed(KeyCode::Q) || input.pressed(KeyCode::Left) {
+        z += PI / 72.0 * time.delta_seconds() * 60.0;
     }
     if input.pressed(KeyCode::E) || input.pressed(KeyCode::Right) {
-        z -= PI/72.0 * time.delta_seconds() * 60.0;
+        z -= PI / 72.0 * time.delta_seconds() * 60.0;
     }
 
     // Clamp
-    z = z.clamp(-PI/8.0, PI/8.0);
-    rotation = Quat::from_euler(EulerRot::XYZ, x, y ,z);
+    z = z.clamp(-PI / 8.0, PI / 8.0);
+    rotation = Quat::from_euler(EulerRot::XYZ, x, y, z);
 
     translation.y = translation.y.clamp(-500.0, 500.0);
 
@@ -391,12 +449,16 @@ fn break_bricks(
 
                     // e2 is a brick colliding with a ball
                     if e1 == ball && brick_e2.is_ok() {
-                        server.broadcast(&BrickBreak(brick_e2.unwrap().1.0)).unwrap();
+                        server
+                            .broadcast(&BrickBreak(brick_e2.unwrap().1 .0))
+                            .unwrap();
                         commands.entity(e2).despawn();
                     }
                     // e1 is a brick colliding with a ball
                     if e2 == ball && brick_e1.is_ok() {
-                        server.broadcast(&BrickBreak(brick_e1.unwrap().1.0)).unwrap();
+                        server
+                            .broadcast(&BrickBreak(brick_e1.unwrap().1 .0))
+                            .unwrap();
                         commands.entity(e1).despawn();
                     }
                 }
@@ -412,9 +474,7 @@ fn break_bricks(
     }
 }
 
-fn clamp_ball_speed(
-    mut q_ball: Query<&mut Velocity, With<Ball>>,
-) {
+fn clamp_ball_speed(mut q_ball: Query<&mut Velocity, With<Ball>>) {
     if let Some(mut ball) = q_ball.iter_mut().next() {
         if ball.linear.x.abs() < 200.0 {
             if ball.linear.x < 0.0 {
@@ -457,29 +517,34 @@ fn game_win(
                     };
                     server.broadcast(&GameWin(win_side)).unwrap();
                     commands.entity(e).despawn();
-                    commands.spawn_bundle(TextBundle {
-                        node: Default::default(),
-                        style: Style {
-                            position_type: PositionType::Absolute,
-                            margin: Rect::all(Val::Auto),
-                            padding: Rect::all(Val::Px(10.0)),
-                            flex_direction: FlexDirection::ColumnReverse,
-                            align_items: AlignItems::Center,
-                            align_self: AlignSelf::Center,
-                            size: Size { width: Val::Percent(100.0), height: Val::Auto },
-                            ..default()
-                        },
-                        text: Text::with_section(
-                            format!("{winner} wins!"),
-                            TextStyle {
-                                font,
-                                font_size: 60.0,
-                                color: Color::BLACK,
+                    commands
+                        .spawn_bundle(TextBundle {
+                            node: Default::default(),
+                            style: Style {
+                                position_type: PositionType::Absolute,
+                                margin: Rect::all(Val::Auto),
+                                padding: Rect::all(Val::Px(10.0)),
+                                flex_direction: FlexDirection::ColumnReverse,
+                                align_items: AlignItems::Center,
+                                align_self: AlignSelf::Center,
+                                size: Size {
+                                    width: Val::Percent(100.0),
+                                    height: Val::Auto,
+                                },
+                                ..default()
                             },
-                            TextAlignment::default(),
-                        ),
-                        ..default()
-                    }).insert(GameItem);
+                            text: Text::with_section(
+                                format!("{winner} wins!"),
+                                TextStyle {
+                                    font,
+                                    font_size: 60.0,
+                                    color: Color::BLACK,
+                                },
+                                TextAlignment::default(),
+                            ),
+                            ..default()
+                        })
+                        .insert(GameItem);
                 }
             }
         }
@@ -498,37 +563,39 @@ fn game_win(
             let ball = q_ball.iter().next().unwrap();
             commands.entity(ball).despawn();
 
-            commands.spawn_bundle(TextBundle {
-                node: Default::default(),
-                style: Style {
-                    position_type: PositionType::Absolute,
-                    margin: Rect::all(Val::Auto),
-                    padding: Rect::all(Val::Px(10.0)),
-                    flex_direction: FlexDirection::ColumnReverse,
-                    align_items: AlignItems::Center,
-                    align_self: AlignSelf::Center,
-                    size: Size { width: Val::Percent(100.0), height: Val::Auto },
-                    ..default()
-                },
-                text: Text::with_section(
-                    format!("{winner} wins!"),
-                    TextStyle {
-                        font,
-                        font_size: 60.0,
-                        color: Color::BLACK,
+            commands
+                .spawn_bundle(TextBundle {
+                    node: Default::default(),
+                    style: Style {
+                        position_type: PositionType::Absolute,
+                        margin: Rect::all(Val::Auto),
+                        padding: Rect::all(Val::Px(10.0)),
+                        flex_direction: FlexDirection::ColumnReverse,
+                        align_items: AlignItems::Center,
+                        align_self: AlignSelf::Center,
+                        size: Size {
+                            width: Val::Percent(100.0),
+                            height: Val::Auto,
+                        },
+                        ..default()
                     },
-                    TextAlignment::default(),
-                ),
-                ..default()
-            }).insert(GameItem);
+                    text: Text::with_section(
+                        format!("{winner} wins!"),
+                        TextStyle {
+                            font,
+                            font_size: 60.0,
+                            color: Color::BLACK,
+                        },
+                        TextAlignment::default(),
+                    ),
+                    ..default()
+                })
+                .insert(GameItem);
         }
     }
 }
 
-fn leave_game_after_win(
-    game_win: Option<Res<GameWinR>>,
-    mut game_state: ResMut<State<GameState>>,
-) {
+fn leave_game_after_win(game_win: Option<Res<GameWinR>>, mut game_state: ResMut<State<GameState>>) {
     if let Some(gw) = game_win {
         if gw.0.elapsed() > Duration::from_millis(3000) {
             let _ = game_state.set(GameState::Menu);
@@ -536,8 +603,16 @@ fn leave_game_after_win(
     }
 }
 
-fn spawn_brick(commands: &mut Commands, color: Color, center: Vec2, width: f32, height: f32, id: u32) -> Entity {
-    commands.spawn()
+fn spawn_brick(
+    commands: &mut Commands,
+    color: Color,
+    center: Vec2,
+    width: f32,
+    height: f32,
+    id: u32,
+) -> Entity {
+    commands
+        .spawn()
         .insert_bundle(SpriteBundle {
             sprite: Sprite {
                 custom_size: Some(Vec2::new(width, height)),
@@ -547,8 +622,14 @@ fn spawn_brick(commands: &mut Commands, color: Color, center: Vec2, width: f32, 
             transform: Transform::from_xyz(center.x, center.y, 0.0),
             ..Default::default()
         })
-        .insert(CollisionShape::Cuboid { half_extends: Vec3::new(width/2.0, height/2.0, 0.0), border_radius: None })
-        .insert(PhysicMaterial { restitution: 1.0, ..Default::default() })
+        .insert(CollisionShape::Cuboid {
+            half_extends: Vec3::new(width / 2.0, height / 2.0, 0.0),
+            border_radius: None,
+        })
+        .insert(PhysicMaterial {
+            restitution: 1.0,
+            ..Default::default()
+        })
         .insert(RigidBody::Static)
         .insert(GameItem)
         .insert(Brick(id))
@@ -556,10 +637,7 @@ fn spawn_brick(commands: &mut Commands, color: Color, center: Vec2, width: f32, 
         .id()
 }
 
-fn clean_up(
-    mut commands: Commands,
-    q_game_items: Query<Entity, With<GameItem>>,
-) {
+fn clean_up(mut commands: Commands, q_game_items: Query<Entity, With<GameItem>>) {
     for e in q_game_items.iter() {
         commands.entity(e).despawn_recursive();
     }

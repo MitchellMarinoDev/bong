@@ -1,14 +1,13 @@
-use std::any::Any;
-use std::marker::PhantomData;
-use carrier_pigeon::net::CIdSpec::All;
-use crate::Component;
 use crate::plugin::net::NetDirection;
 use crate::plugin::net::NetDirection::*;
+use crate::Component;
+use carrier_pigeon::net::CIdSpec::All;
+use std::any::Any;
+use std::marker::PhantomData;
 
 /// A component that tells `bevy-pigeon` to sync the component `T`
 /// which is sent as `M`.
-#[derive(Component)]
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Component, Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub struct NetComp<T, M = T>
 where
     T: Clone + Into<M> + Component,
@@ -16,7 +15,7 @@ where
 {
     // TODO: Add option for changed only.
     pub dir: NetDirection,
-    _pd: PhantomData<(T, M)>
+    _pd: PhantomData<(T, M)>,
 }
 
 impl<T, M> Default for NetComp<T, M>
@@ -33,9 +32,9 @@ where
 }
 
 impl<T, M> NetComp<T, M>
-    where
-        T: Clone + Into<M> + Component,
-        M: Clone + Into<T> + Any + Send + Sync,
+where
+    T: Clone + Into<M> + Component,
+    M: Clone + Into<T> + Any + Send + Sync,
 {
     pub fn new(dir: NetDirection) -> Self {
         NetComp {

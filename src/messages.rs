@@ -5,8 +5,8 @@ use carrier_pigeon::{CId, MsgTable, Transport};
 use heron::Velocity;
 use serde::{Deserialize, Serialize};
 
-use crate::{default, Quat, Vec2};
 use crate::game::Team;
+use crate::{default, Quat, Vec2};
 
 /// The connection message.
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
@@ -16,9 +16,7 @@ pub struct Connection {
 
 impl Connection {
     pub fn new(name: impl Into<String>) -> Self {
-        Connection {
-            name: name.into(),
-        }
+        Connection { name: name.into() }
     }
 }
 
@@ -33,7 +31,7 @@ impl ConnectionBroadcast {
     pub fn new(name: impl Into<String>, cid: CId) -> Self {
         ConnectionBroadcast {
             name: name.into(),
-            cid
+            cid,
         }
     }
 }
@@ -58,14 +56,16 @@ pub enum RejectReason {
 
 /// The disconnection message.
 #[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
-pub struct Disconnect {
-
-}
+pub struct Disconnect {}
 
 pub fn get_table() -> MsgTable {
     let mut table = MsgTable::new();
-    table.register::<ConnectionBroadcast>(Transport::TCP).unwrap();
-    table.register::<DisconnectBroadcast>(Transport::TCP).unwrap();
+    table
+        .register::<ConnectionBroadcast>(Transport::TCP)
+        .unwrap();
+    table
+        .register::<DisconnectBroadcast>(Transport::TCP)
+        .unwrap();
     table.register::<StartGame>(Transport::TCP).unwrap();
     table.register::<BrickBreak>(Transport::TCP).unwrap();
     table.register::<GameWin>(Transport::TCP).unwrap();
