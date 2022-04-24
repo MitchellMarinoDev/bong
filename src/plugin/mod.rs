@@ -1,17 +1,16 @@
 use crate::plugin::tick::{client_tick, server_tick};
 use bevy::prelude::*;
 
-mod net;
-mod net_comp;
+mod app;
+mod sync;
 mod tick;
 
-pub use net::AppExt;
-pub use net::NetDirection;
-pub use net::NetEntity;
-pub use net_comp::NetComp;
+pub use app::AppExt;
+pub use sync::NetComp;
+pub use sync::NetDirection;
+pub use sync::NetEntity;
 
 pub struct ClientPlugin;
-
 pub struct ServerPlugin;
 
 impl Plugin for ClientPlugin {

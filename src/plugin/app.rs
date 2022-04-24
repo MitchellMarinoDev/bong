@@ -1,72 +1,10 @@
-use std::any::Any;
-
+//! The app extension.
+use crate::plugin::sync::{NetCompMsg, NetDirection};
 use bevy::prelude::*;
-use carrier_pigeon::net::CIdSpec;
-use carrier_pigeon::{CId, Client, MsgRegError, MsgTable, Server, Transport};
+use carrier_pigeon::{Client, MsgRegError, MsgTable, Server, Transport};
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-
-use crate::plugin::net_comp::NetComp;
-
-/// The synchronizing direction for data.
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub enum NetDirection {
-    /// Synchronize data **to** the peer, from this instance.
-    ///
-    /// On a server, the [`CIdSpec`] is used to specify who to send the data to.
-    To(CIdSpec),
-    /// Synchronize data **from** the peer, to this instance.
-    ///
-    /// On a server, the [`CIdSpec`] is used to specify who to receive the data from.
-    From(CIdSpec),
-    /// Synchronize data to the peer, and form the peer. **This option is not valid on a client.**
-    ///
-    /// On a server, the [`CIdSpec`]s are used to specify who to send/receive the data to/from.
-    ToFrom(CIdSpec, CIdSpec),
-}
-
-impl NetDirection {
-    /// Shorthand for [`NetDirection::To(CIdSpec::All)`].
-    pub fn to() -> Self {
-        NetDirection::To(CIdSpec::All)
-    }
-
-    /// Shorthand for [`NetDirection::From(CIdSpec::All)`].
-    pub fn from() -> Self {
-        NetDirection::From(CIdSpec::All)
-    }
-}
-
-/// A networked entity.
-///
-/// Any entity using [`NetComp`] needs to have one of these
-#[derive(Component, Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub struct NetEntity {
-    /// A unique identifier that needs to be the same on all connected instances of the game.
-    /// A random `u64` provides a very low collision rate.
-    pub id: u64,
-}
-
-impl NetEntity {
-    pub fn new(id: u64) -> Self {
-        NetEntity { id }
-    }
-}
-
-/// The message type to be sent.
-///
-/// This wraps the component message type with the entity's `id`.
-#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
-pub(crate) struct NetCompMsg<M: Any + Send + Sync> {
-    id: u64,
-    msg: M,
-}
-
-impl<M: Any + Send + Sync> NetCompMsg<M> {
-    pub fn new(id: u64, msg: M) -> Self {
-        NetCompMsg { id, msg }
-    }
-}
+use serde::Serialize;
+use std::any::Any;
 
 /// An extension trait for easy registering [`NetComp`] types.
 pub trait AppExt {
@@ -120,7 +58,8 @@ impl AppExt for App {
         M: Clone + Into<T> + Any + Send + Sync + Serialize + DeserializeOwned,
     {
         table.register::<NetCompMsg<M>>(transport)?;
-        Ok(self.add_system(network_comp_sys::<T, M>))
+        self.add_system(network_comp_sys::<T, M>);
+        Ok(self)
     }
 }
 
