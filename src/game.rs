@@ -1,6 +1,5 @@
 use crate::lobby::Players;
 use crate::messages::{BrickBreak, GameWin};
-use crate::plugin::{NetComp, NetDirection, NetEntity};
 use crate::{GameState, MyTransform, MyVelocity};
 use bevy::ecs::query::QueryEntityError;
 use bevy::prelude::*;
@@ -11,8 +10,7 @@ use heron::*;
 use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
 use std::time::{Duration, Instant};
-use CIdSpec::All;
-use NetDirection::*;
+use bevy_pigeon::{NetComp, NetDirection, NetEntity};
 
 pub struct GamePlugin;
 
@@ -137,7 +135,7 @@ fn setup_game(mut commands: Commands, server: Option<Res<Server>>, assets: Res<A
     let ball_ico = assets.load("ball.png");
 
     // ball
-    let dir = if server.is_some() { To(All) } else { From(All) };
+    let dir = if server.is_some() { NetDirection::to() } else { NetDirection::from() };
     let velocity_comp = NetComp::<Velocity, MyVelocity>::new(dir);
     let transform_comp = NetComp::<Transform, MyTransform>::new(dir);
 

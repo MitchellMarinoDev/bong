@@ -2,13 +2,12 @@ mod game;
 mod lobby;
 mod menu;
 mod messages;
-mod plugin;
 
 use crate::messages::{Connection, Disconnect, MyTransform, MyVelocity, Response};
-use crate::plugin::{AppExt, ClientPlugin, ServerPlugin};
 use bevy::prelude::*;
 use bevy::render::camera::ScalingMode;
 use std::net::SocketAddr;
+use bevy_pigeon::{AppExt, ClientPlugin, ServerPlugin};
 // use bevy_editor_pls::EditorPlugin;
 use crate::game::GamePlugin;
 use crate::lobby::LobbyPlugin;

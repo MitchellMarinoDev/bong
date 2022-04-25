@@ -3,6 +3,6 @@
 - [ ] Disconnect.
 - [ ] Delete NetEntity option.
 - [x] Refactor plugin.
-- [ ] Extract plugin.
+- [x] Extract plugin.
 - [ ] RPC like system.
 - [ ] look for unwraps.
