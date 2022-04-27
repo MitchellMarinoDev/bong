@@ -3,14 +3,13 @@ use crate::messages::{BrickBreak, GameWin};
 use crate::{GameState, MyTransform, MyVelocity};
 use bevy::ecs::query::QueryEntityError;
 use bevy::prelude::*;
-use carrier_pigeon::net::CIdSpec;
-use carrier_pigeon::net::CIdSpec::{Except, Only};
 use carrier_pigeon::{Client, Server};
 use heron::*;
 use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
 use std::time::{Duration, Instant};
-use bevy_pigeon::{NetComp, NetDirection, NetEntity};
+use bevy_pigeon::sync::{CNetDir, NetComp, NetEntity, SNetDir};
+use carrier_pigeon::net::CIdSpec;
 
 pub struct GamePlugin;
 
@@ -73,7 +72,7 @@ impl Team {
     }
 }
 
-fn setup_game(mut commands: Commands, server: Option<Res<Server>>, assets: Res<AssetServer>) {
+fn setup_game(mut commands: Commands, assets: Res<AssetServer>) {
     // Walls
     commands
         .spawn()
@@ -135,10 +134,6 @@ fn setup_game(mut commands: Commands, server: Option<Res<Server>>, assets: Res<A
     let ball_ico = assets.load("ball.png");
 
     // ball
-    let dir = if server.is_some() { NetDirection::to() } else { NetDirection::from() };
-    let velocity_comp = NetComp::<Velocity, MyVelocity>::new(dir);
-    let transform_comp = NetComp::<Transform, MyTransform>::new(dir);
-
     commands
         .spawn()
         .insert_bundle(SpriteBundle {
@@ -162,8 +157,8 @@ fn setup_game(mut commands: Commands, server: Option<Res<Server>>, assets: Res<A
         .insert(GameItem)
         .insert(Ball)
         .insert(Name::new("Ball"))
-        .insert(velocity_comp)
-        .insert(transform_comp)
+        .insert(NetComp::<Velocity, MyVelocity>::new(CNetDir::From, SNetDir::to_all(), false))
+        .insert(NetComp::<Transform, MyTransform>::new(CNetDir::From, SNetDir::to_all(), false))
         .insert(NetEntity::new(5768696975200910899));
 
     // Targets
@@ -294,30 +289,24 @@ fn setup_bricks(mut commands: Commands) {
         .push_children(&bricks[..]);
 }
 
-fn setup_paddles(server: Option<Res<Server>>, players: Res<Players>, mut commands: Commands) {
+fn setup_paddles(players: Res<Players>, mut commands: Commands) {
     let width = 30.0;
     let height = 200.0;
 
     let p1 = players.p1.as_ref().unwrap().0;
     let p2 = players.p2.as_ref().unwrap().0;
 
-    let left_dir;
-    let right_dir;
+    let c_left_dir;
+    let c_right_dir;
 
-    if server.is_some() {
-        // Server
-        left_dir = NetDirection::ToFrom(Except(p1), Only(p1));
-        right_dir = NetDirection::ToFrom(Except(p2), Only(p2));
-    } else {
-        match players.me.unwrap() {
-            Team::Left => {
-                left_dir = NetDirection::to();
-                right_dir = NetDirection::from();
-            }
-            Team::Right => {
-                left_dir = NetDirection::from();
-                right_dir = NetDirection::to();
-            }
+    match players.me.unwrap() {
+        Team::Left => {
+            c_left_dir = CNetDir::To;
+            c_right_dir = CNetDir::From;
+        }
+        Team::Right => {
+            c_right_dir = CNetDir::To;
+            c_left_dir = CNetDir::From;
         }
     }
 
@@ -346,7 +335,7 @@ fn setup_paddles(server: Option<Res<Server>>, players: Res<Players>, mut command
         .insert(GameItem)
         .insert(Paddle(Team::Left))
         .insert(NetEntity::new(6413180502345645314))
-        .insert(NetComp::<Transform, MyTransform>::new(left_dir))
+        .insert(NetComp::<Transform, MyTransform>::new(c_left_dir, SNetDir::ToFrom(CIdSpec::Except(p1), CIdSpec::Except(p1)), true))
         .insert(Name::new("Paddle L"));
 
     // Right
@@ -374,7 +363,7 @@ fn setup_paddles(server: Option<Res<Server>>, players: Res<Players>, mut command
         .insert(GameItem)
         .insert(Paddle(Team::Right))
         .insert(NetEntity::new(6413180502345645315))
-        .insert(NetComp::<Transform, MyTransform>::new(right_dir))
+        .insert(NetComp::<Transform, MyTransform>::new(c_right_dir, SNetDir::ToFrom(CIdSpec::Except(p2), CIdSpec::Except(p2)), true))
         .insert(Name::new("Paddle R"));
 }
 
