@@ -157,8 +157,8 @@ fn setup_game(mut commands: Commands, assets: Res<AssetServer>) {
         .insert(GameItem)
         .insert(Ball)
         .insert(Name::new("Ball"))
-        .insert(NetComp::<Velocity, MyVelocity>::new(CNetDir::From, SNetDir::to_all(), false))
-        .insert(NetComp::<Transform, MyTransform>::new(CNetDir::From, SNetDir::to_all(), false))
+        .insert(NetComp::<Velocity, MyVelocity>::new(CNetDir::From, SNetDir::to_all()))
+        .insert(NetComp::<Transform, MyTransform>::new(CNetDir::From, SNetDir::to_all()))
         .insert(NetEntity::new(5768696975200910899));
 
     // Targets
@@ -335,7 +335,7 @@ fn setup_paddles(players: Res<Players>, mut commands: Commands) {
         .insert(GameItem)
         .insert(Paddle(Team::Left))
         .insert(NetEntity::new(6413180502345645314))
-        .insert(NetComp::<Transform, MyTransform>::new(c_left_dir, SNetDir::ToFrom(CIdSpec::Except(p1), CIdSpec::Except(p1)), true))
+        .insert(NetComp::<Transform, MyTransform>::new(c_left_dir, SNetDir::ToFrom(CIdSpec::Except(p1), CIdSpec::Only(p1))))
         .insert(Name::new("Paddle L"));
 
     // Right
@@ -363,7 +363,7 @@ fn setup_paddles(players: Res<Players>, mut commands: Commands) {
         .insert(GameItem)
         .insert(Paddle(Team::Right))
         .insert(NetEntity::new(6413180502345645315))
-        .insert(NetComp::<Transform, MyTransform>::new(c_right_dir, SNetDir::ToFrom(CIdSpec::Except(p2), CIdSpec::Except(p2)), true))
+        .insert(NetComp::<Transform, MyTransform>::new(c_right_dir, SNetDir::ToFrom(CIdSpec::Except(p2), CIdSpec::Only(p2))))
         .insert(Name::new("Paddle R"));
 }
 
