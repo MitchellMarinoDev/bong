@@ -1,6 +1,6 @@
 # Bong
 
-A full bevy game showcasing `bevy-pigeon` and `carrier-pigeon`.
+A full bevy game showcasing [`bevy-pigeon`](https://github.com/mitchellmarinodev/carrier-pigeon) and [`carrier-pigeon`](https://github.com/mitchellmarinodev/carrier-pigeon).
 
 A game that is a combination of breakout and pong.
 

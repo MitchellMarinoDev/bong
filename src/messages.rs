@@ -91,7 +91,7 @@ pub struct BrickBreak(pub u32);
 pub struct MyTransform {
     pub translation: Vec2,
     pub rotation: Quat,
-    // Rotation or scale are not used.
+    // Scale are not used.
 }
 
 impl From<Transform> for MyTransform {
