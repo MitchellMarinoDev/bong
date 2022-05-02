@@ -69,6 +69,7 @@ pub fn get_table() -> MsgTable {
     table.register::<StartGame>(Transport::TCP).unwrap();
     table.register::<BrickBreak>(Transport::TCP).unwrap();
     table.register::<GameWin>(Transport::TCP).unwrap();
+    table.register::<Ping>(Transport::UDP).unwrap();
 
     table
 }
@@ -83,6 +84,15 @@ pub struct GameWin(pub Team);
 
 #[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
 pub struct BrickBreak(pub u32);
+
+#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
+pub struct Ping {
+    /// The time in the network using the timestamps that carrier-pigeon provides
+    /// for udp messages.
+    network: u32,
+    /// The total time including processing time.
+    full: u32,
+}
 
 /// A reduced [`Transform`] component that can be networked.
 ///

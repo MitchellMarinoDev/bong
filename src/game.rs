@@ -23,6 +23,7 @@ impl Plugin for GamePlugin {
         )
         .add_system_set(
             SystemSet::on_update(GameState::Game)
+                .with_system(ping)
                 .with_system(break_bricks)
                 .with_system(move_paddle)
                 .with_system(clamp_ball_speed)
@@ -53,6 +54,13 @@ pub struct Target(Team);
 /// All game items have this so that they can be cleaned up easily.
 pub struct GameItem;
 
+#[derive(Component, Copy, Clone, Eq, PartialEq, Debug, Hash)]
+/// The text field with the ping.
+pub struct PingCounter;
+
+/// The ping timer.
+pub struct PingTimer(Timer);
+
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 /// All game items have this so that they can be cleaned up easily.
 pub struct GameWinR(pub Instant);
@@ -73,6 +81,36 @@ impl Team {
 }
 
 fn setup_game(mut commands: Commands, assets: Res<AssetServer>) {
+    let timer = PingTimer(Timer::new(Duration::from_millis(2000), true));
+    commands.insert_resource(timer);
+
+    let font = assets.load("FiraMono-Medium.ttf");
+
+    // Ping counter
+    commands.spawn_bundle(TextBundle {
+        node: Default::default(),
+        style: Style {
+            position: Rect { top: Val::Px(0.0), left: Val::Px(0.0), right: Val::Auto, bottom: Val::Auto},
+            padding: Rect::all(Val::Px(5.0)),
+            ..default()
+        },
+        text: Text::with_section(
+            "Ping: -",
+            TextStyle {
+                font,
+                font_size: 40.0,
+                color: Color::BLACK,
+            },
+            TextAlignment::default(),
+        ),
+        calculated_size: Default::default(),
+        focus_policy: Default::default(),
+        transform: Default::default(),
+        global_transform: Default::default(),
+        visibility: Default::default(),
+        ..default()
+    }).insert(PingCounter);
+
     // Walls
     commands
         .spawn()
@@ -287,6 +325,13 @@ fn setup_bricks(mut commands: Commands) {
         .insert(Transform::identity())
         .insert(GameItem)
         .push_children(&bricks[..]);
+}
+
+fn ping(
+    time: Res<Time>,
+    timer: ResMut<PingTimer>,
+) {
+    // TODO: impl
 }
 
 fn setup_paddles(players: Res<Players>, mut commands: Commands) {
