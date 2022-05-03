@@ -87,11 +87,8 @@ pub struct BrickBreak(pub u32);
 
 #[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Ping {
-    /// The time in the network using the timestamps that carrier-pigeon provides
-    /// for udp messages.
-    network: u32,
-    /// The total time including processing time.
-    full: u32,
+    /// The total time it takes to send a message and get it back.
+    pub time: u32,
 }
 
 /// A reduced [`Transform`] component that can be networked.

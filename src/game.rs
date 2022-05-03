@@ -1,5 +1,5 @@
 use crate::lobby::Players;
-use crate::messages::{BrickBreak, GameWin};
+use crate::messages::{BrickBreak, GameWin, Ping};
 use crate::{GameState, MyTransform, MyVelocity};
 use bevy::ecs::query::QueryEntityError;
 use bevy::prelude::*;
@@ -7,7 +7,7 @@ use carrier_pigeon::{Client, Server};
 use heron::*;
 use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use bevy_pigeon::sync::{CNetDir, NetComp, NetEntity, SNetDir};
 use carrier_pigeon::net::CIdSpec;
 
@@ -109,7 +109,9 @@ fn setup_game(mut commands: Commands, assets: Res<AssetServer>) {
         global_transform: Default::default(),
         visibility: Default::default(),
         ..default()
-    }).insert(PingCounter);
+    })
+        .insert(PingCounter)
+        .insert(GameItem);
 
     // Walls
     commands
@@ -327,11 +329,52 @@ fn setup_bricks(mut commands: Commands) {
         .push_children(&bricks[..]);
 }
 
+// TODO: remove when carrier-pigeon updates.
+/// Gets the current unix millis as a u32.
+pub fn unix_millis() -> u32 {
+    let millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Current system time is earlier than the UNIX_EPOCH")
+        .as_millis();
+    (millis & 0xFFFF_FFFF) as u32
+}
+
 fn ping(
+    mut q_ping_txt: Query<&mut Text, With<PingCounter>>,
     time: Res<Time>,
-    timer: ResMut<PingTimer>,
+    mut timer: ResMut<PingTimer>,
+    server: Option<Res<Server>>,
+    client: Option<Res<Client>>,
 ) {
-    // TODO: impl
+    if let Some(ref client) = client {
+        for msg in client.recv::<Ping>().unwrap() {
+            let now = unix_millis();
+            let diff = (now - msg.time.unwrap()) + (*msg).time;
+            if let Ok(mut text) = q_ping_txt.get_single_mut() {
+                text.sections[0].value = format!("Ping: {}ms", diff);
+            }
+        }
+    }
+
+    // Server respond to pings
+    if let Some(ref server) = server {
+        for msg in server.recv::<Ping>().unwrap() {
+            let mut ping_msg = msg.m.clone();
+            let now = unix_millis();
+            ping_msg.time = now - msg.time.unwrap();
+            server.send_to(msg.cid, &ping_msg).unwrap();
+        }
+    }
+
+    // Client send pings.
+    if timer.0.tick(time.delta()).just_finished() {
+        // send ping packet.
+        if let Some(ref client) = client {
+            client.send(&Ping {
+                time: 0,
+            }).unwrap();
+        }
+    }
 }
 
 fn setup_paddles(players: Res<Players>, mut commands: Commands) {
