@@ -87,7 +87,7 @@ pub struct BrickBreak(pub u32);
 
 #[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Ping {
-    /// The total time it takes to send a message and get it back.
+    /// The send timestamp in unix millis.
     pub time: u32,
 }
 

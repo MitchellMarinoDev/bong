@@ -349,7 +349,7 @@ fn ping(
     if let Some(ref client) = client {
         for msg in client.recv::<Ping>().unwrap() {
             let now = unix_millis();
-            let diff = (now - msg.time.unwrap()) + (*msg).time;
+            let diff = now - msg.m.time;
             if let Ok(mut text) = q_ping_txt.get_single_mut() {
                 text.sections[0].value = format!("Ping: {}ms", diff);
             }
@@ -359,9 +359,7 @@ fn ping(
     // Server respond to pings
     if let Some(ref server) = server {
         for msg in server.recv::<Ping>().unwrap() {
-            let mut ping_msg = msg.m.clone();
-            let now = unix_millis();
-            ping_msg.time = now - msg.time.unwrap();
+            let ping_msg = msg.m.clone();
             server.send_to(msg.cid, &ping_msg).unwrap();
         }
     }
@@ -371,7 +369,7 @@ fn ping(
         // send ping packet.
         if let Some(ref client) = client {
             client.send(&Ping {
-                time: 0,
+                time: unix_millis(),
             }).unwrap();
         }
     }
