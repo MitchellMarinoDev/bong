@@ -351,7 +351,7 @@ fn ping(
             let now = unix_millis();
             let diff = now - msg.m.time;
             if let Ok(mut text) = q_ping_txt.get_single_mut() {
-                text.sections[0].value = format!("Ping: {}ms", diff);
+                text.sections[0].value = format!("Effective Latency: {}ms", diff);
             }
         }
     }
