@@ -95,7 +95,7 @@ fn setup_game(mut commands: Commands, assets: Res<AssetServer>) {
             ..default()
         },
         text: Text::with_section(
-            "Ping: -",
+            "Effective Latency: -",
             TextStyle {
                 font,
                 font_size: 40.0,
@@ -347,7 +347,7 @@ fn ping(
     client: Option<Res<Client>>,
 ) {
     if let Some(ref client) = client {
-        for msg in client.recv::<Ping>().unwrap() {
+        for msg in client.recv::<Ping>() {
             let now = unix_millis();
             let diff = now - msg.m.time;
             if let Ok(mut text) = q_ping_txt.get_single_mut() {
@@ -358,9 +358,9 @@ fn ping(
 
     // Server respond to pings
     if let Some(ref server) = server {
-        for msg in server.recv::<Ping>().unwrap() {
+        for msg in server.recv::<Ping>() {
             let ping_msg = msg.m.clone();
-            server.send_to(msg.cid, &ping_msg).unwrap();
+            server.send_to(&ping_msg, msg.cid).unwrap();
         }
     }
 
@@ -538,7 +538,7 @@ fn break_bricks(
             }
         }
     } else if let Some(client) = client {
-        let ids: Vec<_> = client.recv::<BrickBreak>().unwrap().map(|m| m.0).collect();
+        let ids: Vec<_> = client.recv::<BrickBreak>().map(|m| m.0).collect();
         for (e, brick) in q_brick.iter() {
             if ids.contains(&brick.0) {
                 commands.entity(e).despawn();
@@ -622,7 +622,7 @@ fn game_win(
             }
         }
     } else if let Some(client) = client {
-        for gw in client.recv::<GameWin>().unwrap() {
+        for gw in client.recv::<GameWin>() {
             commands.insert_resource(GameWinR(Instant::now()));
 
             let font = assets.load("FiraMono-Medium.ttf");

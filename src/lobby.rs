@@ -321,7 +321,7 @@ fn setup_lobby_ui(mut commands: Commands, assets: Res<AssetServer>) {
 
 fn game_start(client: Option<Res<Client>>, mut game_state: ResMut<State<GameState>>) {
     if let Some(client) = client {
-        if client.recv::<StartGame>().unwrap().count() >= 1 {
+        if client.recv::<StartGame>().count() >= 1 {
             let _ = game_state.set(GameState::Game);
         }
     }
@@ -423,7 +423,7 @@ fn handle_connections(
             server.broadcast(&bm).unwrap();
         }
     } else if let Some(client) = client {
-        for msg in client.recv::<ConnectionBroadcast>().unwrap() {
+        for msg in client.recv::<ConnectionBroadcast>() {
             players.add(msg.cid, msg.name.clone());
         }
     }
@@ -445,7 +445,7 @@ fn handle_disconnections(
             server.broadcast(&bm).unwrap();
         }
     } else if let Some(client) = client {
-        for msg in client.recv::<DisconnectBroadcast>().unwrap() {
+        for msg in client.recv::<DisconnectBroadcast>() {
             println!("Disconnection broadcast received.");
             players.remove_cid(msg.cid);
         }

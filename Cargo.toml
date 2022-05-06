@@ -7,11 +7,10 @@ edition = "2021"
 
 [dependencies]
 bevy = "0.7.0"
-carrier-pigeon = { git = "https://github.com/mitchellmarinodev/carrier-pigeon", rev = "70c365451fddb7de3dc4d3c856e9b3afdf014680" }
-bevy-pigeon = { git = "https://github.com/mitchellmarinodev/bevy-pigeon", rev = "e7ae54a1866eccd532ba52d3d5fe36cdedef15ab" }
+carrier-pigeon = { git = "https://github.com/mitchellmarinodev/carrier-pigeon" }
+bevy-pigeon = { git = "https://github.com/mitchellmarinodev/bevy-pigeon" }
 serde = { version = "~1.0", features = ["derive"] }
 heron = { version = "3.0", features = ["2d"] }
-bevy_editor_pls = { git = "https://github.com/jakobhellermann/bevy_editor_pls.git" }
 
 [profile.dev.package."*"]
 opt-level = 3

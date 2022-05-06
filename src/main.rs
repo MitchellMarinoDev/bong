@@ -75,7 +75,8 @@ fn main() {
 
     let parts = table.build::<Connection, Response, Disconnect>().unwrap();
 
-    app.insert_resource(GameIp(ip))
+    app
+        .insert_resource(GameIp(ip))
         .insert_resource(Name(name))
         .insert_resource(parts)
         .insert_resource(WindowDescriptor {
@@ -86,6 +87,7 @@ fn main() {
         .add_state(GameState::Menu)
         .add_plugins(DefaultPlugins)
         .add_plugin(PhysicsPlugin::default())
+
         .add_plugin(ClientPlugin)
         .add_plugin(ServerPlugin)
         .add_plugin(GamePlugin)
