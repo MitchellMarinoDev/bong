@@ -26,6 +26,7 @@ impl Plugin for GamePlugin {
             ).add_system_set(
             SystemSet::on_update(GameState::Game)
                 .with_system(ping)
+                .with_system(bong)
                 .with_system(break_bricks)
                 .with_system(move_paddle)
                 .with_system(clamp_ball_speed)
@@ -89,7 +90,7 @@ struct Sfx {
 
 fn load_sfx(
     mut commands: Commands,
-    mut assets: ResMut<AssetServer>,
+    assets: ResMut<AssetServer>,
 ) {
     let bink = [
         assets.load("sfx/bink.000.ogg"),
@@ -536,6 +537,28 @@ fn move_paddle(
     // Apply
     paddle.0.rotation = rotation;
     paddle.0.translation = translation;
+}
+
+fn bong(
+    mut collisions: EventReader<CollisionEvent>,
+    audio: Res<Audio>,
+    sfx: Res<Sfx>,
+    q_paddle: Query<&Paddle>,
+) {
+    let mut rng = rand::thread_rng();
+
+    for collision in collisions.iter() {
+        if let CollisionEvent::Stopped(d1, d2) = collision {
+            if q_paddle.get(d1.rigid_body_entity()).is_ok() ||
+                q_paddle.get(d2.rigid_body_entity()).is_ok() {
+                let b = rng.gen();
+                let i = rng.gen_range(0, 4);
+                let clip = if b { &sfx.bink[i] } else { &sfx.bonk[i] };
+
+                audio.play((*clip).clone());
+            }
+        }
+    }
 }
 
 fn break_bricks(
