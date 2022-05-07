@@ -1,8 +1,0 @@
-- Networked entities have the `NetworkedEntity` Component that contains a unique ID to relate entities across different worlds.
-- These entities may have `NetworkedComponent<CompToBeSynced>`.
-	- A system will sync the components on entities with CompToBeSynced.
-	- This would require an ownership system to show the direction of syncing.
-		- This should likely be done per NetworkedComponent, so that the client can own Inputs, and the server can use Inputs to produce position.
-- Needs to be able to have client side prediction.
-
-

@@ -3,7 +3,7 @@ use crate::messages::{ConnectionBroadcast, DisconnectBroadcast, RejectReason, St
 use crate::{Connection, GameIp, GameState, MultiplayerType, Name, Response};
 use bevy::prelude::PositionType::Absolute;
 use bevy::prelude::*;
-use carrier_pigeon::net::CIdSpec;
+use carrier_pigeon::net::{CIdSpec, Config};
 use carrier_pigeon::{CId, Client, MsgTableParts, OptionPendingClient, Server};
 use std::f32::consts::PI;
 
@@ -121,19 +121,19 @@ fn setup_networking(
     match *multiplayer_type {
         MultiplayerType::Server => {
             println!("server");
-            commands.insert_resource(Server::new(ip.0, parts.clone()).unwrap());
+            commands.insert_resource(Server::new(ip.0, parts.clone(), Config::default()).unwrap());
         }
         MultiplayerType::Host => {
             println!("host");
-            commands.insert_resource(Server::new(ip.0, parts.clone()).unwrap());
+            commands.insert_resource(Server::new(ip.0, parts.clone(), Config::default()).unwrap());
             commands.insert_resource(
-                Client::new(ip.0, parts.clone(), Connection::new(name.0.clone())).option(),
+                Client::new(ip.0, parts.clone(), Config::default(), Connection::new(name.0.clone())).option(),
             );
         }
         MultiplayerType::Client => {
             println!("client");
             commands.insert_resource(
-                Client::new(ip.0, parts.clone(), Connection::new(name.0.clone())).option(),
+                Client::new(ip.0, parts.clone(), Config::default(), Connection::new(name.0.clone())).option(),
             );
         }
     }
