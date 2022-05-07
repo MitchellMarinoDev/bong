@@ -10,18 +10,20 @@ use std::f32::consts::PI;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use bevy_pigeon::sync::{CNetDir, NetComp, NetEntity, SNetDir};
 use carrier_pigeon::net::CIdSpec;
+use rand::Rng;
 
 pub struct GamePlugin;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(
+        app
+            .add_startup_system(load_sfx)
+            .add_system_set(
             SystemSet::on_enter(GameState::Game)
                 .with_system(setup_game)
                 .with_system(setup_bricks)
                 .with_system(setup_paddles),
-        )
-        .add_system_set(
+            ).add_system_set(
             SystemSet::on_update(GameState::Game)
                 .with_system(ping)
                 .with_system(break_bricks)
@@ -29,8 +31,7 @@ impl Plugin for GamePlugin {
                 .with_system(clamp_ball_speed)
                 .with_system(game_win)
                 .with_system(leave_game_after_win),
-        )
-        .add_system_set(SystemSet::on_exit(GameState::Game).with_system(clean_up));
+            ).add_system_set(SystemSet::on_exit(GameState::Game).with_system(clean_up));
     }
 }
 
@@ -78,6 +79,42 @@ impl Team {
             Team::Right => Team::Left,
         }
     }
+}
+
+struct Sfx {
+    bink: [Handle<AudioSource>; 4],
+    bonk: [Handle<AudioSource>; 4],
+    pop: [Handle<AudioSource>; 4],
+}
+
+fn load_sfx(
+    mut commands: Commands,
+    mut assets: ResMut<AssetServer>,
+) {
+    let bink = [
+        assets.load("sfx/bink.000.ogg"),
+        assets.load("sfx/bink.001.ogg"),
+        assets.load("sfx/bink.002.ogg"),
+        assets.load("sfx/bink.003.ogg"),
+    ];
+    let bonk = [
+        assets.load("sfx/bonk.000.ogg"),
+        assets.load("sfx/bonk.001.ogg"),
+        assets.load("sfx/bonk.002.ogg"),
+        assets.load("sfx/bonk.003.ogg"),
+    ];
+    let pop = [
+        assets.load("sfx/pop.000.ogg"),
+        assets.load("sfx/pop.001.ogg"),
+        assets.load("sfx/pop.002.ogg"),
+        assets.load("sfx/pop.003.ogg"),
+    ];
+
+    commands.insert_resource(Sfx {
+        bink,
+        bonk,
+        pop,
+    })
 }
 
 fn setup_game(mut commands: Commands, assets: Res<AssetServer>) {
@@ -508,7 +545,11 @@ fn break_bricks(
     q_brick: Query<(Entity, &Brick)>,
     mut collisions: EventReader<CollisionEvent>,
     mut commands: Commands,
+    audio: Res<Audio>,
+    sfx: Res<Sfx>
 ) {
+    let mut rng = rand::thread_rng();
+
     if let Some(server) = server {
         // Break balls based on collision
         if let Some(ball) = q_ball.iter().next() {
@@ -526,6 +567,8 @@ fn break_bricks(
                             .broadcast(&BrickBreak(brick_e2.unwrap().1 .0))
                             .unwrap();
                         commands.entity(e2).despawn();
+                        let i = rng.gen_range(0, 4);
+                        audio.play(sfx.pop[i].clone());
                     }
                     // e1 is a brick colliding with a ball
                     if e2 == ball && brick_e1.is_ok() {
@@ -533,6 +576,8 @@ fn break_bricks(
                             .broadcast(&BrickBreak(brick_e1.unwrap().1 .0))
                             .unwrap();
                         commands.entity(e1).despawn();
+                        let i = rng.gen_range(0, 4);
+                        audio.play(sfx.pop[i].clone());
                     }
                 }
             }
