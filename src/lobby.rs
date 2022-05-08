@@ -391,7 +391,7 @@ fn handle_ui(
                     if let Some(server) = &mut server {
                         if players.count() == 2 {
                             let _ = game_state.set(GameState::Game);
-                            server.send_spec(&StartGame, CIdSpec::All).unwrap();
+                            server.send_spec(CIdSpec::All, &StartGame).unwrap();
                         }
                     }
                 }
