@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use bevy_pigeon::sync::{CNetDir, NetComp, NetEntity, SNetDir};
-use carrier_pigeon::net::CIdSpec;
+use carrier_pigeon::net::{CIdSpec, Status};
 use rand::Rng;
 
 pub struct GamePlugin;
@@ -17,6 +17,7 @@ pub struct GamePlugin;
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app
+            .add_event::<GameWinE>()
             .add_startup_system(load_sfx)
             .add_system_set(
             SystemSet::on_enter(GameState::Game)
@@ -27,10 +28,12 @@ impl Plugin for GamePlugin {
             SystemSet::on_update(GameState::Game)
                 .with_system(ping)
                 .with_system(bong)
+                .with_system(handle_discon)
                 .with_system(break_bricks)
                 .with_system(move_paddle)
                 .with_system(clamp_ball_speed)
-                .with_system(game_win)
+                .with_system(check_game_win)
+                .with_system(handle_game_win)
                 .with_system(leave_game_after_win),
             ).add_system_set(SystemSet::on_exit(GameState::Game).with_system(clean_up));
     }
@@ -64,8 +67,12 @@ pub struct PingCounter;
 pub struct PingTimer(Timer);
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-/// All game items have this so that they can be cleaned up easily.
+/// The game win instant.
 pub struct GameWinR(pub Instant);
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+/// The game win event.
+pub struct GameWinE(Team);
 
 #[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub enum Team {
@@ -633,106 +640,83 @@ fn clamp_ball_speed(mut q_ball: Query<&mut Velocity, With<Ball>>) {
     }
 }
 
-fn game_win(
-    players: Res<Players>,
+fn check_game_win(
     server: Option<Res<Server>>,
     client: Option<Res<Client>>,
     q_targets: Query<(&Target, &Collisions)>,
     q_ball: Query<Entity, With<Ball>>,
-    assets: Res<AssetServer>,
-    mut commands: Commands,
+    mut e_game_win: EventWriter<GameWinE>,
 ) {
-    if let Some(server) = server {
+    if let Some(_server) = server {
         for (target, collisions) in q_targets.iter() {
             let collisions: &Collisions = collisions;
             for e in collisions.entities() {
                 if q_ball.get(e).is_ok() {
-                    commands.insert_resource(GameWinR(Instant::now()));
-
-                    let font = assets.load("FiraMono-Medium.ttf");
-
                     let win_side = target.0.other();
-                    let winner = match win_side {
-                        Team::Left => players.p1.as_ref().unwrap().1.clone(),
-                        Team::Right => players.p2.as_ref().unwrap().1.clone(),
-                    };
-                    server.broadcast(&GameWin(win_side)).unwrap();
-                    commands.entity(e).despawn();
-                    commands
-                        .spawn_bundle(TextBundle {
-                            node: Default::default(),
-                            style: Style {
-                                position_type: PositionType::Absolute,
-                                margin: Rect::all(Val::Auto),
-                                padding: Rect::all(Val::Px(10.0)),
-                                flex_direction: FlexDirection::ColumnReverse,
-                                align_items: AlignItems::Center,
-                                align_self: AlignSelf::Center,
-                                size: Size {
-                                    width: Val::Percent(100.0),
-                                    height: Val::Auto,
-                                },
-                                ..default()
-                            },
-                            text: Text::with_section(
-                                format!("{winner} wins!"),
-                                TextStyle {
-                                    font,
-                                    font_size: 60.0,
-                                    color: Color::BLACK,
-                                },
-                                TextAlignment::default(),
-                            ),
-                            ..default()
-                        })
-                        .insert(GameItem);
+                    e_game_win.send(GameWinE(win_side));
                 }
             }
         }
     } else if let Some(client) = client {
         for gw in client.recv::<GameWin>() {
-            commands.insert_resource(GameWinR(Instant::now()));
-
-            let font = assets.load("FiraMono-Medium.ttf");
-
-            let win_side = gw.0;
-            let winner = match win_side {
-                Team::Left => players.p1.as_ref().unwrap().1.clone(),
-                Team::Right => players.p2.as_ref().unwrap().1.clone(),
-            };
-
-            let ball = q_ball.iter().next().unwrap();
-            commands.entity(ball).despawn();
-
-            commands
-                .spawn_bundle(TextBundle {
-                    node: Default::default(),
-                    style: Style {
-                        position_type: PositionType::Absolute,
-                        margin: Rect::all(Val::Auto),
-                        padding: Rect::all(Val::Px(10.0)),
-                        flex_direction: FlexDirection::ColumnReverse,
-                        align_items: AlignItems::Center,
-                        align_self: AlignSelf::Center,
-                        size: Size {
-                            width: Val::Percent(100.0),
-                            height: Val::Auto,
-                        },
-                        ..default()
-                    },
-                    text: Text::with_section(
-                        format!("{winner} wins!"),
-                        TextStyle {
-                            font,
-                            font_size: 60.0,
-                            color: Color::BLACK,
-                        },
-                        TextAlignment::default(),
-                    ),
-                    ..default()
-                })
-                .insert(GameItem);
+            e_game_win.send(GameWinE(gw.0));
         }
+    }
+}
+
+fn handle_game_win(
+    players: Res<Players>,
+    server: Option<Res<Server>>,
+    assets: Res<AssetServer>,
+    q_ball: Query<Entity, With<Ball>>,
+    mut e_game_win: EventReader<GameWinE>,
+    mut commands: Commands,
+) {
+    for gw in e_game_win.iter() {
+        commands.insert_resource(GameWinR(Instant::now()));
+
+        if let Some(ref server) = server {
+            server.broadcast(&GameWin(gw.0)).unwrap();
+        }
+
+        let font = assets.load("FiraMono-Medium.ttf");
+
+        let winner = match gw.0 {
+            Team::Left => players.p1.as_ref().unwrap().1.clone(),
+            Team::Right => players.p2.as_ref().unwrap().1.clone(),
+        };
+        // Despawn balls.
+        for b in q_ball.iter() {
+            commands.entity(b).despawn();
+        }
+        commands
+            .spawn_bundle(TextBundle {
+                node: Default::default(),
+                style: Style {
+                    position_type: PositionType::Absolute,
+                    margin: Rect::all(Val::Auto),
+                    padding: Rect::all(Val::Px(10.0)),
+                    flex_direction: FlexDirection::ColumnReverse,
+                    align_items: AlignItems::Center,
+                    align_self: AlignSelf::Center,
+                    size: Size {
+                        width: Val::Percent(100.0),
+                        height: Val::Auto,
+                    },
+                    ..default()
+                },
+                text: Text::with_section(
+                    format!("{} wins!", winner),
+                    TextStyle {
+                        font,
+                        font_size: 60.0,
+                        color: Color::BLACK,
+                    },
+                    TextAlignment::default(),
+                ),
+                ..default()
+            })
+            .insert(GameItem);
     }
 }
 
@@ -776,6 +760,51 @@ fn spawn_brick(
         .insert(Brick(id))
         .insert(Name::new("Brick"))
         .id()
+}
+
+fn handle_discon(
+    server: Option<ResMut<Server>>,
+    mut e_game_win: EventWriter<GameWinE>,
+    players: Res<Players>,
+) {
+    if let Some(mut server) = server {
+        let mut discons = vec![];
+
+        server.handle_disconnects(&mut |cid, status| {
+            match status {
+                Status::Closed => {
+                    info!("Connection {} Closed", cid);
+                },
+                Status::Disconnected(_discon) => {
+                    info!("Client {} disconnected", cid);
+                },
+                Status::Dropped(e) => {
+                    info!("Client {} Dropped with e: {}", cid, e);
+                },
+                Status::Connected => {}, // Not possible.
+            }
+
+            discons.push(cid);
+        });
+
+
+        for cid in discons {
+            if let Some(ref p1) = players.p1 {
+                if p1.0 == cid {
+                    info!("Player 1 disconnected. Player 2 wins.");
+                    // Left player disconnected. Right wins.
+                    e_game_win.send(GameWinE(Team::Right));
+                }
+            }
+            if let Some(ref p2) = players.p2 {
+                if p2.0 == cid {
+                    info!("Player 2 disconnected. Player 1 wins.");
+                    // Right player disconnected. Left wins.
+                    e_game_win.send(GameWinE(Team::Left));
+                }
+            }
+        }
+    }
 }
 
 fn clean_up(mut commands: Commands, q_game_items: Query<Entity, With<GameItem>>) {

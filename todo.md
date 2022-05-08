@@ -1,7 +1,8 @@
 # TODO:
-- [ ] Disconnect.
+- [ ] In Game Disconnect.
 - [ ] Delete NetEntity option.
 - [ ] look for unwraps.
-- [ ] audio
-- [ ] minimzing window kills it.
-- [ ] game crash on client exit
+- [x] audio
+- [ ] minimizing window crashes it.
+- [ ] game crash on client exit.
+- [ ] Powerups.
