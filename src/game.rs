@@ -27,7 +27,7 @@ impl Plugin for GamePlugin {
             ).add_system_set(
             SystemSet::on_update(GameState::Game)
                 .with_system(ping)
-                .with_system(bong)
+                .with_system(sfx)
                 .with_system(handle_discon)
                 .with_system(break_bricks)
                 .with_system(move_paddle)
@@ -546,7 +546,7 @@ fn move_paddle(
     paddle.0.translation = translation;
 }
 
-fn bong(
+fn sfx(
     mut collisions: EventReader<CollisionEvent>,
     audio: Res<Audio>,
     sfx: Res<Sfx>,
@@ -582,7 +582,7 @@ fn break_bricks(
 
     if let Some(server) = server {
         // Break balls based on collision
-        if let Some(ball) = q_ball.iter().next() {
+        for ball in q_ball.iter() {
             for event in collisions.iter() {
                 if let CollisionEvent::Stopped(d1, d2) = event {
                     let e1 = d1.rigid_body_entity();
@@ -623,7 +623,7 @@ fn break_bricks(
 }
 
 fn clamp_ball_speed(mut q_ball: Query<&mut Velocity, With<Ball>>) {
-    if let Some(mut ball) = q_ball.iter_mut().next() {
+    for mut ball in q_ball.iter_mut() {
         if ball.linear.x.abs() < 200.0 {
             if ball.linear.x < 0.0 {
                 ball.linear.x = -200.0
@@ -651,6 +651,7 @@ fn check_game_win(
         for (target, collisions) in q_targets.iter() {
             let collisions: &Collisions = collisions;
             for e in collisions.entities() {
+                // If the thing we collided with was a ball
                 if q_ball.get(e).is_ok() {
                     let win_side = target.0.other();
                     e_game_win.send(GameWinE(win_side));
